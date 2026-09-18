@@ -95,6 +95,87 @@ if (loginForm) {
 const adminMain = document.querySelector(".admin__main");
 if (adminMain) {
 
+  /* ---------- custom dropdowns for selects (instant open, nicer look) ---------- */
+  (function initSelectDrawers() {
+    if (!window.MutationObserver) return;
+    const isEsc = str => String(str ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    document.querySelectorAll("select.field__input, select.field-input").forEach(sel => {
+      if (sel.closest(".dd")) return;
+      const wrap = document.createElement("div");
+      wrap.className = "dd";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "dd__btn";
+      btn.setAttribute("aria-haspopup", "listbox");
+      const list = document.createElement("div");
+      list.className = "dd__list";
+      list.setAttribute("role", "listbox");
+      list.hidden = true;
+      sel.classList.add("dd__hidden");
+      sel.parentNode.insertBefore(wrap, sel.nextSibling);
+      wrap.appendChild(sel);
+      wrap.appendChild(list);
+
+      const lab = o => (o ? isEsc(o.textContent || o.value || "") : "");
+      const close = () => { wrap.classList.remove("is-open"); list.hidden = true; btn.setAttribute("aria-expanded", "false"); };
+      const sync = () => {
+        const picked = sel.selectedOptions && sel.selectedOptions[0];
+        btn.textContent = lab(picked);
+        Array.from(list.children).forEach(it =>
+          it.classList.toggle("is-picked", it.dataset.v === sel.value));
+      };
+      const build = () => {
+        list.innerHTML = "";
+        Array.from(sel.options).forEach(o => {
+          const it = document.createElement("button");
+          it.type = "button";
+          it.className = "dd__item";
+          it.setAttribute("role", "option");
+          it.dataset.v = o.value;
+          it.textContent = lab(o);
+          it.addEventListener("click", () => {
+            sel.value = o.value;
+            sync();
+            close();
+            sel.dispatchEvent(new Event("change", { bubbles: true }));
+          });
+          list.appendChild(it);
+        });
+        sync();
+      };
+      const open = () => {
+        build();
+        list.hidden = false;
+        wrap.classList.add("is-open");
+        btn.setAttribute("aria-expanded", "true");
+        const others = document.querySelectorAll(".dd.is-open");
+        others.forEach(d => { if (d !== wrap) d.classList.remove("is-open"); });
+      };
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        wrap.classList.contains("is-open") ? close() : open();
+      });
+      document.addEventListener("click", e => { if (!wrap.contains(e.target)) close(); });
+      btn.addEventListener("keydown", e => {
+        const opts = Array.from(sel.options);
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          const i = opts.findIndex(x => x.value === sel.value);
+          const n = (i + (e.key === "ArrowDown" ? 1 : -1) + opts.length) % opts.length;
+          if (opts[n]) { sel.value = opts[n].value; sync(); }
+        } else if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          wrap.classList.contains("is-open") ? close() : open();
+        } else if (e.key === "Escape") {
+          close();
+        }
+      });
+      new MutationObserver(() => build())
+        .observe(sel, { childList: true, subtree: true, attributes: true, attributeFilter: ["selected", "value"] });
+      build();
+    });
+  })();
+
   /* ---------- custom skins (storage handled by db.js — Supabase/local) ---------- */
   const addCustomSkin = obj => {
     const custom = getCustom().filter(s => s.name !== obj.name);
@@ -1019,6 +1100,7 @@ const tog = e.target.closest("[data-cp-toggle]");
 
   /* ---------- sidebar / burger ---------- */
   const burger = $id("burger");
+  const sideClose = $id("sideClose");
   const side = $id("sideBar");
   const backdrop = $id("sideBackdrop");
   function toggleSide(open) {
@@ -1027,6 +1109,10 @@ const tog = e.target.closest("[data-cp-toggle]");
   }
   burger.addEventListener("click", () => toggleSide(!side.classList.contains("is-open")));
   if (backdrop) backdrop.addEventListener("click", () => toggleSide(false));
+  if (sideClose) sideClose.addEventListener("click", () => toggleSide(false));
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") toggleSide(false);
+  });
 
   /* ---------- sections as separate tabs ---------- */
   const sections = [...document.querySelectorAll(".panel-card")];

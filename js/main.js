@@ -34,7 +34,7 @@ const I18N = {
     heroBrowse: "مشاهده مارکت",
     statSkins: "اسکین در فروش", statVolume: "حجم مارکت", statTraders: "کاربران فعال", statUnit: "تومان",
     searchPlaceholder: "جستجوی اسکین... (مثلاً AK-47 Asiimov)",
-    filtersTitle: "فیلترها", filtersClear: "حذف همه",
+    filtersTitle: "فیلترها", filtersClear: "حذف همه", filtersBtn: "فیلتر",
     fgRarity: "راریتی", fgGuns: "نوع گان", fgWear: "وضعیت / Wear", fgType: "نوع اسکین", fgPrice: "حداکثر قیمت",
     rarConsumer: "Consumer Grade", rarIndustrial: "Industrial Grade", rarMilSpec: "Mil-Spec Grade",
     rarRestricted: "Restricted", rarClassified: "Classified", rarCovert: "Covert",
@@ -42,7 +42,6 @@ const I18N = {
     wrWell: "Well-Worn", wrBattle: "Battle-Scarred",
     tyNormal: "Normal",
     priceTo: "تا سقف",
-    sortFeatured: "پیشنهادی", sortAsc: "قیمت: ارزان → گران", sortDesc: "قیمت: گران → ارزان", sortName: "نام",
     count: "{n} آیتم",
     emptyTitle: "اسکینی با این فیلترها پیدا نشد.", emptyReset: "ریست فیلترها",
     trust1: "تحویل فوری", trust2: "معامله ۱۰۰٪ امن", trust3: "کارمزد صفر خرید", trust4: "تحویل ~۱۰ ثانیه‌ای",
@@ -99,7 +98,7 @@ const I18N = {
     heroBrowse: "Browse Market",
     statSkins: "Skins on sale", statVolume: "Market volume", statTraders: "Active users", statUnit: "Toman",
     searchPlaceholder: "Search skins... (e.g. AK-47 Asiimov)",
-    filtersTitle: "Filters", filtersClear: "Clear all",
+    filtersTitle: "Filters", filtersClear: "Clear all", filtersBtn: "Filter",
     fgRarity: "Rarity", fgGuns: "Gun type", fgWear: "Condition / Wear", fgType: "Skin type", fgPrice: "Max price",
     rarConsumer: "Consumer Grade", rarIndustrial: "Industrial Grade", rarMilSpec: "Mil-Spec Grade",
     rarRestricted: "Restricted", rarClassified: "Classified", rarCovert: "Covert",
@@ -107,7 +106,6 @@ const I18N = {
     wrWell: "Well-Worn", wrBattle: "Battle-Scarred",
     tyNormal: "Normal",
     priceTo: "Up to",
-    sortFeatured: "Featured", sortAsc: "Price: Low → High", sortDesc: "Price: High → Low", sortName: "Name",
     count: "{n} items",
     emptyTitle: "No skins match your filters.", emptyReset: "Reset filters",
     trust1: "Instant Delivery", trust2: "100% Secure Trades", trust3: "0% Buyer Fees", trust4: "~10 sec Delivery",
@@ -712,25 +710,11 @@ if (profileModal) {
   const priceVal = $id("priceVal");
   const emptyReset = $id("emptyReset");
 
-  let sortMode = "featured";
-  const sortSelect = $id("sortSelect");
   function applySort(list) {
-    const arr = (Array.isArray(list) ? list : []).slice();
-    if (sortMode === "asc") {
-      arr.sort((a, b) => skinFinalPrice(a) - skinFinalPrice(b));
-    } else if (sortMode === "desc") {
-      arr.sort((a, b) => skinFinalPrice(b) - skinFinalPrice(a));
-    } else if (sortMode === "name") {
-      arr.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
-    } else {
-      arr.sort((a, b) => ((typeof FEATURED !== "undefined" ? FEATURED.indexOf(a.name) : -1) - (typeof FEATURED !== "undefined" ? FEATURED.indexOf(b.name) : -1)) || (a.sort - b.sort));
-    }
-    return arr;
+    return (Array.isArray(list) ? list : []).slice().sort(
+      (a, b) => ((typeof FEATURED !== "undefined" ? FEATURED.indexOf(a.name) : -1) -
+                 (typeof FEATURED !== "undefined" ? FEATURED.indexOf(b.name) : -1)) || (a.sort - b.sort));
   }
-  if (sortSelect) sortSelect.addEventListener("change", () => {
-    sortMode = sortSelect.value || "featured";
-    globalState();
-  });
 
   function render(list) {
     grid.innerHTML = list.map((s, idx) => {
@@ -1187,6 +1171,37 @@ if (profileModal) {
     globalState();
     searchInput.focus();
   });
+
+  /* ===== Mobile hamburger menu ===== */
+  const hamburgerBtn = $id("hamburgerBtn");
+  const hamburgerMenu = $id("hamburgerMenu");
+  if (hamburgerBtn && hamburgerMenu) {
+    function closeHamburger() {
+      hamburgerMenu.hidden = true;
+      hamburgerBtn.classList.remove("is-open");
+    }
+    function toggleHamburger() {
+      hamburgerMenu.hidden = !hamburgerMenu.hidden;
+      hamburgerBtn.classList.toggle("is-open", !hamburgerMenu.hidden);
+    }
+    hamburgerBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      toggleHamburger();
+    });
+    hamburgerMenu.querySelectorAll("[data-hm]").forEach(b => {
+      b.addEventListener("click", () => {
+        const target = $id(b.dataset.hm);
+        if (target) target.click();
+        closeHamburger();
+      });
+    });
+    document.addEventListener("click", e => {
+      if (!hamburgerMenu.hidden && !e.target.closest(".header")) closeHamburger();
+    });
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape" && !hamburgerMenu.hidden) closeHamburger();
+    });
+  }
   document.addEventListener("click", e => {
     if (searchbar.classList.contains("is-open") && !searchbar.contains(e.target)) closeSearch();
     if (drawer.classList.contains("is-open") && !drawer.contains(e.target) && !miniCart.contains(e.target)) closeCart();
@@ -1211,8 +1226,26 @@ if (profileModal) {
   window.addEventListener("scroll", onScrollHeader, { passive: true });
 
   const filtersSide = $id("filters");
+  const filtersBackdrop = $id("filtersBackdrop");
+  const filtersClose = $id("filtersClose");
+  function closeFilters() {
+    filtersSide.classList.remove("is-open");
+    if (filtersBackdrop) filtersBackdrop.classList.remove("is-on");
+  }
+  function openFilters() {
+    filtersSide.classList.add("is-open");
+    if (filtersBackdrop) filtersBackdrop.classList.add("is-on");
+  }
   $id("filtersToggle").addEventListener("click", () =>
-    filtersSide.classList.toggle("is-open"));
+    filtersSide.classList.contains("is-open") ? closeFilters() : openFilters());
+  if (filtersClose) filtersClose.addEventListener("click", closeFilters);
+  if (filtersBackdrop) filtersBackdrop.addEventListener("click", closeFilters);
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && filtersSide.classList.contains("is-open")) closeFilters();
+  });
+
+  document.querySelectorAll(".filter-group h3").forEach(h =>
+    h.addEventListener("click", () => h.closest(".filter-group")?.classList.toggle("is-open")));
 
   $id("heroBrowse").addEventListener("click", () =>
     $id("market") ? $id("market").scrollIntoView({ behavior: "smooth" }) : null);
@@ -1491,9 +1524,11 @@ if (profileModal) {
       });
     });
     if (!chips) { latestEl.hidden = true; recentSlide.innerHTML = ""; return; }
-    /* duplicate once for a seamless marquee loop (only when there's enough to scroll) */
-    recentSlide.innerHTML = itemCount >= 4 ? chips + chips : chips;
-    recentSlide.classList.toggle("is-anim", itemCount >= 4);
+    /* auto-marquee only on wide screens; on phones use a native touch scroll */
+    const isMobileTrack = window.innerWidth <= 640;
+    const animate = !isMobileTrack && itemCount >= 4;
+    recentSlide.innerHTML = animate ? chips + chips : chips;
+    recentSlide.classList.toggle("is-anim", animate);
     if (latestCount) {
       latestCount.textContent =
         (lang === "fa" ? showNum(itemCount) + " آیتم خرید اخیر ・ " + timeAgo(recent[0].date) : showNum(itemCount) + " recent items ・ " + timeAgo(recent[0].date));

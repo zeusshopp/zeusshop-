@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#070604" />
   <title>ZEUSSHOP — خرید و فروش اسکین CS2</title>
   <link rel="icon" type="image/png" href="image/fav.png" />
-  <link rel="stylesheet" href="css/fonts.css?v=74" />
-  <link rel="stylesheet" href="css/style.css?v=74" />
-  <link rel="stylesheet" href="css/admin.css?v=74" />
+  <link rel="stylesheet" href="css/fonts.css?v=81" />
+  <link rel="stylesheet" href="css/style.css?v=81" />
+  <link rel="stylesheet" href="css/admin.css?v=81" />
 </head>
 <body>
 
@@ -44,6 +44,9 @@
         <button class="avatar" id="avatarBtn" aria-label="Profile">
           <img id="headerAvatar" src="https://avatars.githubusercontent.com/u/0" alt="User" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><circle cx=%2212%22 cy=%228%22 r=%224%22 fill=%22%23c7b862%22/><path d=%22M4 21c0-4 3.6-6 8-6s8 2 8 6%22 fill=%22%23c7b862%22/></svg>'" />
         </button>
+      <button class="icon-btn hamburger" id="hamburgerBtn" aria-label="Menu">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
       </div>
     </div>
 
@@ -54,6 +57,17 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
+    </div>
+
+    <div class="hamburger-menu" id="hamburgerMenu" hidden>
+      <button class="hm__item" data-hm="invNav">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l9-4 9 4-9 4-9-4Z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>
+        <span data-i18n="navInv">اینونتوری</span>
+      </button>
+      <button class="hm__item" data-hm="raffleNav">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3.4M12 17.6V21M3 12h3.4M17.6 12H21M5.6 5.6l2.4 2.4M16 16l2.4 2.4M18.4 5.6 16 8M8 16l-2.4 2.4"/></svg>
+        <span data-i18n="navRaffle">قرعه کشی</span>
+      </button>
     </div>
   </header>
 
@@ -122,13 +136,19 @@
 
   <!-- ===== MARKET ===== -->
   <main class="market container reveal" id="market">
+    <div class="filters-backdrop" id="filtersBackdrop"></div>
     <aside class="filters" id="filters">
       <div class="filters__head">
         <h2 data-i18n="filtersTitle">فیلترها</h2>
-        <button class="filters__clear" id="clearFilters" data-i18n="filtersClear">حذف همه</button>
+        <div class="filters__head-actions">
+          <button class="filters__clear" id="clearFilters" data-i18n="filtersClear">حذف همه</button>
+          <button class="icon-btn filters__close" id="filtersClose" aria-label="Close">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
       </div>
 
-      <div class="filter-group">
+      <div class="filter-group is-open">
         <h3 data-i18n="fgGuns">نوع گان</h3>
         <div class="chips">
           <label class="chip"><input type="checkbox" class="flt-weapon" value="Knife"> <i style="--c:#b9b1a0"></i><span>Knife</span></label>
@@ -176,15 +196,7 @@
       <div class="catalog__toolbar">
         <div class="catalog__result-count" id="resultCount">0 آیتم</div>
         <div class="catalog__tools">
-          <select class="catalog__sort" id="sortSelect" aria-label="Sort">
-            <option value="featured" data-i18n="sortFeatured">پیشنهادی</option>
-            <option value="asc" data-i18n="sortAsc">قیمت: ارزان ← گران</option>
-            <option value="desc" data-i18n="sortDesc">قیمت: گران ← ارزان</option>
-            <option value="name" data-i18n="sortName">نام</option>
-          </select>
-          <button class="icon-btn filters-toggle" id="filtersToggle" aria-label="Filters">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
-          </button>
+          <button class="filters-toggle" id="filtersToggle" data-i18n="filtersBtn">فیلتر</button>
         </div>
       </div>
 
@@ -346,8 +358,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/supabase-config.js?v=74"></script>
-  <script src="js/db.js?v=74"></script>
-  <script src="js/main.js?v=74"></script>
+  <script src="js/supabase-config.js?v=81"></script>
+  <script src="js/db.js?v=81"></script>
+  <script src="js/main.js?v=81"></script>
 </body>
 </html>
