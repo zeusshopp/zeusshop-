@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#070604" />
+  <title>ZEUSSHOP — خرید و فروش اسکین CS2</title>
+  <link rel="icon" type="image/png" href="image/fav.png" />
+  <link rel="stylesheet" href="css/fonts.css?v=74" />
+  <link rel="stylesheet" href="css/style.css?v=74" />
+  <link rel="stylesheet" href="css/admin.css?v=74" />
+</head>
+<body>
+
+  <div class="noise"></div>
+
+  <!-- ===== HEADER ===== -->
+  <header class="header">
+    <div class="container header__in">
+      <a href="index.html" class="logo">
+        <img class="logo__img" src="image/logo.png" alt="ZEUSSHOP" />
+        <span>ZEUS<b>SHOP</b></span>
+      </a>
+
+      <div class="header__actions">
+        <button class="lang-btn" id="langToggle" aria-label="Switch language">EN</button>
+
+        <button class="inv-btn raffle-btn" id="raffleNav" aria-label="Raffle">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3.4M12 17.6V21M3 12h3.4M17.6 12H21M5.6 5.6l2.4 2.4M16 16l2.4 2.4M18.4 5.6 16 8M8 16l-2.4 2.4"/></svg>
+          <span data-i18n="navRaffle">قرعه‌کشی</span>
+        </button>
+
+        <button class="inv-btn" id="invNav" aria-label="Inventory">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l9-4 9 4-9 4-9-4Z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>
+          <span data-i18n="navInv">اینونتوری</span>
+        </button>
+
+        <button class="icon-btn" id="searchToggle" aria-label="Search">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>
+          </svg>
+        </button>
+
+        <button class="avatar" id="avatarBtn" aria-label="Profile">
+          <img id="headerAvatar" src="https://avatars.githubusercontent.com/u/0" alt="User" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><circle cx=%2212%22 cy=%228%22 r=%224%22 fill=%22%23c7b862%22/><path d=%22M4 21c0-4 3.6-6 8-6s8 2 8 6%22 fill=%22%23c7b862%22/></svg>'" />
+        </button>
+      </div>
+    </div>
+
+    <div class="searchbar" id="searchbar">
+      <div class="container">
+        <input type="text" id="searchInput" data-i18n-ph="searchPlaceholder" placeholder="جستجوی اسکین... (مثلاً AK-47 Asiimov)" />
+        <button class="searchbar__clear" id="searchClear" aria-label="Clear search" hidden>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== ANNOUNCEMENT MODAL (admin-controlled) ===== -->
+  <div class="ann-modal" id="annModal" hidden>
+    <div class="ann-modal__overlay" data-ann-close></div>
+    <div class="ann-modal__box" role="dialog" aria-modal="true">
+      <div class="ann-modal__icon"><img src="image/logo.png" alt="ZEUSSHOP" /></div>
+      <h3 data-i18n="annTitle">اعلامیه</h3>
+      <p id="annText"></p>
+      <button class="btn btn--primary" id="annOk" data-i18n="annOk">تایید ✓</button>
+    </div>
+  </div>
+
+  <!-- ===== MY INVENTORY (purchase history) ===== -->
+  <section class="inv-page" id="invPage">
+    <div class="container">
+      <div class="inv-page__head">
+        <h2>
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l9-4 9 4-9 4-9-4Z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>
+          <span data-i18n="invTitle">اینونتوری من</span>
+        </h2>
+        <button class="btn btn--ghost btn--sm" id="invBack" data-i18n="invBack">بازگشت به مارکت</button>
+      </div>
+      <div class="grid" id="invGrid"></div>
+      <div class="empty" id="invEmpty" hidden>
+        <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 12h6M12 9v6"/></svg>
+        <p data-i18n="invEmptyTitle">هنوز آیتمی در اینونتوری شما نیست.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== HERO ===== -->
+  <section class="hero">
+    <div class="hero__bg" aria-hidden="true"></div>
+    <div class="hero__rings" aria-hidden="true"><span></span><span></span><span></span></div>
+    <div class="container">
+      <div class="hero__badge" data-i18n="heroBadge">مارکت زنده · ۴ اسکین در فروش</div>
+      <h1 class="hero__title" id="heroTitle" data-i18n-html="heroTitle">
+        خرید و فروش <span class="hero__accent">اسکین CS2</span><br/>در چند ثانیه
+      </h1>
+      <p class="hero__sub" data-i18n="heroSub">تحویل آنی به اکانت استیم شما، با کمترین کارمزد.</p>
+      <div class="hero__cta">
+        <button class="btn btn--primary" id="heroBrowse" data-i18n="heroBrowse">مشاهده مارکت</button>
+      </div>
+      <div class="hero__stats">
+        <div class="stat"><span class="stat__num" id="statSkinsCount" data-stat="skins">0</span><span class="stat__lbl" data-i18n="statSkins">اسکین در فروش</span></div>
+        <div class="stat"><span class="stat__num"><b id="statVolume">0</b><em class="stat__unit" data-i18n="statUnit">تومان</em></span><span class="stat__lbl" data-i18n="statVolume">حجم مارکت</span></div>
+        <div class="stat"><span class="stat__num" id="statUsersCount" data-stat="users" data-prefix="+">0</span><span class="stat__lbl" data-i18n="statTraders">کاربران فعال</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== LAST PURCHASES ===== -->
+  <div class="latest" id="latestBuy" hidden>
+    <div class="container">
+      <div class="latest__head">
+        <span class="latest__label"><i class="latest__dot" aria-hidden="true"></i><span data-i18n="latestLabel">آخرین خریدهای تاییدشده</span></span>
+        <span class="latest__count" id="latestCount"></span>
+      </div>
+      <div class="recent">
+        <div class="recent__track" id="recentSlide" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MARKET ===== -->
+  <main class="market container reveal" id="market">
+    <aside class="filters" id="filters">
+      <div class="filters__head">
+        <h2 data-i18n="filtersTitle">فیلترها</h2>
+        <button class="filters__clear" id="clearFilters" data-i18n="filtersClear">حذف همه</button>
+      </div>
+
+      <div class="filter-group">
+        <h3 data-i18n="fgGuns">نوع گان</h3>
+        <div class="chips">
+          <label class="chip"><input type="checkbox" class="flt-weapon" value="Knife"> <i style="--c:#b9b1a0"></i><span>Knife</span></label>
+          <label class="chip"><input type="checkbox" class="flt-weapon" value="Pistol"> <i style="--c:#ff9b5a"></i><span>Pistol</span></label>
+          <label class="chip"><input type="checkbox" class="flt-weapon" value="Machineguns"> <i style="--c:#a8822f"></i><span>Machineguns</span></label>
+          <label class="chip"><input type="checkbox" class="flt-weapon" value="Shotgun"> <i style="--c:#8847ff"></i><span>Shotgun</span></label>
+          <label class="chip"><input type="checkbox" class="flt-weapon" value="SMG"> <i style="--c:#d32ce6"></i><span>SMG</span></label>
+          <label class="chip"><input type="checkbox" class="flt-weapon" value="Rifle"> <i style="--c:#eb4b4b"></i><span>Rifle</span></label>
+          <label class="chip"><input type="checkbox" class="flt-weapon" value="Snipers"> <i style="--c:#d9a441"></i><span>Snipers</span></label>
+          <label class="chip"><input type="checkbox" class="flt-weapon" value="GLOVES"> <i style="--c:#57cb62"></i><span>GLOVES</span></label>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <h3 data-i18n="fgWear">وضعیت / Wear</h3>
+        <div class="chips">
+          <label class="chip"><input type="checkbox" class="flt-wear" value="Factory New"> <i style="--c:#7bc94e"></i><span data-i18n="wrFactoryNew">Factory New</span></label>
+          <label class="chip"><input type="checkbox" class="flt-wear" value="Minimal Wear"> <i style="--c:#8fd36a"></i><span data-i18n="wrMinimal">Minimal Wear</span></label>
+          <label class="chip"><input type="checkbox" class="flt-wear" value="Field-Tested"> <i style="--c:#a8822f"></i><span data-i18n="wrField">Field-Tested</span></label>
+          <label class="chip"><input type="checkbox" class="flt-wear" value="Well-Worn"> <i style="--c:#d9a25e"></i><span data-i18n="wrWell">Well-Worn</span></label>
+          <label class="chip"><input type="checkbox" class="flt-wear" value="Battle-Scarred"> <i style="--c:#eb4b4b"></i><span data-i18n="wrBattle">Battle-Scarred</span></label>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <h3 data-i18n="fgType">نوع اسکین</h3>
+        <div class="chips">
+          <label class="chip"><input type="checkbox" class="flt-type" value="Normal"> <i style="--c:#b9b1a0"></i><span data-i18n="tyNormal">Normal</span></label>
+          <label class="chip"><input type="checkbox" class="flt-type" value="StatTrak™"> <i style="--c:#e4ae39"></i><span>StatTrak™</span></label>
+          <label class="chip"><input type="checkbox" class="flt-type" value="Souvenir"> <i style="--c:#8847ff"></i><span>Souvenir</span></label>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <h3 data-i18n="fgPrice">حداکثر قیمت</h3>
+        <div class="range-wrap">
+          <input type="range" id="priceRange" min="0" max="1000" value="1000" class="range" />
+          <div class="range-lbl"><span data-i18n="priceTo">تا سقف</span> <b id="priceVal">۲۰۰ میلیون تومان</b></div>
+          <div class="range-hint">۱٬۰۰۰ — ۲۰۰٬۰۰۰٬۰۰۰ تومان</div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="catalog">
+      <div class="catalog__toolbar">
+        <div class="catalog__result-count" id="resultCount">0 آیتم</div>
+        <div class="catalog__tools">
+          <select class="catalog__sort" id="sortSelect" aria-label="Sort">
+            <option value="featured" data-i18n="sortFeatured">پیشنهادی</option>
+            <option value="asc" data-i18n="sortAsc">قیمت: ارزان ← گران</option>
+            <option value="desc" data-i18n="sortDesc">قیمت: گران ← ارزان</option>
+            <option value="name" data-i18n="sortName">نام</option>
+          </select>
+          <button class="icon-btn filters-toggle" id="filtersToggle" aria-label="Filters">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid" id="skinsGrid"></div>
+      <div class="empty" id="emptyState" hidden>
+        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2M8 11h6"/></svg>
+        <p data-i18n="emptyTitle">اسکینی با این فیلترها پیدا نشد.</p>
+        <button class="btn btn--ghost" id="emptyReset" data-i18n="emptyReset">ریست فیلترها</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer reveal">
+    <div class="container footer__in">
+      <div class="footer__brand">
+        <div class="logo"><img class="logo__img" src="image/logo.png" alt="ZEUSSHOP" /><span>ZEUS<b>SHOP</b></span></div>
+        <p data-i18n="footerDesc">بهترین مارکت‌پلیس اسکین CS2. ساخته‌شده برای گیمرها، توسط گیمرها.</p>
+      </div>
+      <div class="footer__note">
+        <h4 data-i18n-html="footerNoteTitle">چرا <span dir="ltr">ZEUSSHOP</span></h4>
+        <p data-i18n="footerNote">مارکت‌پلیس سریع و امن اسکین‌های CS2؛ تحویل آنی روی آیدی تلگرام، بدون کارمزد برای خریدار و ضمانت ۱۰۰٪ معامله.</p>
+      </div>
+      <div class="footer__contact">
+        <h4 data-i18n="footerContactTitle">پشتیبانی</h4>
+        <a href="https://t.me/zeusshop00" target="_blank" rel="noopener" data-i18n="footerTelegram">کانال ما در تلگرام</a>
+        <a href="https://t.me/ZEUS_ADMIN0" target="_blank" rel="noopener" data-i18n="footerSupport">پشتیبانی 24/7</a>
+      </div>
+    </div>
+    <div class="container footer__trust">
+      <div class="trust__item">
+        <span class="trust__ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg></span>
+        <div class="trust__txt"><b data-i18n="ft1t">سفارش سریع</b><span data-i18n="ft1d">اسکین را انتخاب کن و مشخصات موردنظر خودت را تعیین کن.</span></div>
+      </div>
+      <div class="trust__item">
+        <span class="trust__ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg></span>
+        <div class="trust__txt"><b data-i18n="ft2t">ارتباط مستقیم</b><span data-i18n="ft2d">سفارش از طریق تلگرام مدیریت پیگیری می‌شود.</span></div>
+      </div>
+      <div class="trust__item">
+        <span class="trust__ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 13a8 8 0 0 1 16 0"/><rect x="2" y="13" width="4" height="6" rx="2"/><rect x="18" y="13" width="4" height="6" rx="2"/><path d="M20 19a4 4 0 0 1-4 4h-2"/></svg></span>
+        <div class="trust__txt"><b data-i18n="ft3t">پشتیبانی</b><span data-i18n="ft3d">برای پیگیری سفارش با مدیریت در ارتباط باش.</span></div>
+      </div>
+    </div>
+    <div class="container footer__bottom">
+      <p data-i18n="footerCr">© 2026 ZEUSSHOP. وابسته به Valve نیست.</p>
+      <div class="footer__pay" data-i18n="footerPay">تحویل از طریق تلگرام / استیم</div>
+    </div>
+  </footer>
+
+  <!-- ===== MINI CART BUTTON (corner) ===== -->
+  <button class="mini-cart" id="miniCart" aria-label="Cart" hidden>
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9H6L4 3H2"/><circle cx="9" cy="20" r="1.6"/><circle cx="17" cy="20" r="1.6"/></svg>
+    <span class="mini-cart__count" id="miniCartCount">0</span>
+  </button>
+
+  <!-- ===== CART DRAWER ===== -->
+  <aside class="drawer" id="cartDrawer" aria-label="Cart">
+    <div class="drawer__head">
+      <svg class="drawer__icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6h15l-1.5 9H6L4 3H2"/><circle cx="9" cy="20" r="1.6"/><circle cx="17" cy="20" r="1.6"/></svg>
+      <h3 data-i18n="cartTitle">سبد خرید <span id="cartDrawerCount">0</span></h3>
+      <button class="icon-btn" id="closeCart" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="drawer__body" id="cartBody">
+      <div class="drawer__empty">
+        <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 6h15l-1.5 9H6L4 3H2"/><circle cx="9" cy="20" r="1.6"/><circle cx="17" cy="20" r="1.6"/></svg>
+        <p data-i18n="cartEmpty">سبد خرید شما خالی است.</p>
+      </div>
+    </div>
+    <div class="drawer__foot" id="cartFoot" hidden>
+      <div class="coupon" id="couponWrap">
+        <input class="field__input coupon__in" id="couponInput" dir="ltr" autocomplete="off" data-i18n-ph="couponPh" placeholder="کد تخفیف (اختیاری)" />
+        <button class="btn btn--ghost coupon__btn" id="couponApply" type="button" data-i18n="couponApply">اعمال</button>
+      </div>
+      <p class="coupon__msg" id="couponMsg" hidden></p>
+      <button class="coupon__rm" id="couponRemove" type="button" hidden data-i18n="couponRemove">حذف کد</button>
+      <div class="drawer__total"><span data-i18n="cartTotal">جمع کل</span><b id="cartTotal">$0.00</b></div>
+      <button class="btn btn--primary btn--block" id="checkoutBtn" data-i18n="cartCheckout">نهایی‌کردن خرید</button>
+    </div>
+  </aside>
+
+  <!-- ===== SKIN DETAIL MODAL ===== -->
+  <div class="overlay" id="skinOverlay"></div>
+  <div class="modal" id="skinModal" role="dialog" aria-label="Skin">
+    <div class="modal__box skin-modal">
+      <button class="icon-btn skin-modal__close" id="closeSkin" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <div class="skin-modal__img">
+        <span class="card__glow" aria-hidden="true"></span>
+        <img id="skinModalImg" src="" alt="" onerror="this.style.display='none'" />
+      </div>
+      <div class="skin-modal__body">
+        <div class="skin-rows" id="skinModalRows"></div>
+        <div class="skin-modal__price" id="skinModalPrice"></div>
+        <button class="btn btn--primary btn--block" id="skinModalBuy"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PROFILE MODAL ===== -->
+  <div class="overlay" id="profileOverlay"></div>
+  <div class="modal" id="profileModal" role="dialog" aria-label="Profile">
+    <div class="modal__box">
+      <div class="modal__head">
+        <h3 data-i18n="profileTitle">پروفایل</h3>
+        <button class="icon-btn" id="closeProfile" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <div class="profile-avatar">
+          <img id="profileAvatar" src="" alt="User" onerror="this.onerror=null;this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><circle cx=%2212%22 cy=%228%22 r=%224%22 fill=%22%23c7b862%22/><path d=%22M4 21c0-4 3.6-6 8-6s8 2 8 6%22 fill=%22%23c7b862%22/></svg>'" />
+        </div>
+
+        <label class="field-label" for="telegramInput" data-i18n="profileTgLabel">آیدی تلگرام</label>
+        <input type="text" id="telegramInput" class="field-input" dir="auto" data-i18n-ph="profileTgPlace" placeholder="@username یا +98912..." autocomplete="off" />
+        <p class="field-note" data-i18n="profileNote">اسکین‌های خریداری‌شده روی همین آیدی تلگرام تحویل داده می‌شوند.</p>
+
+        <button class="btn btn--primary btn--block" id="saveProfile" data-i18n="profileSave">ذخیره پروفایل</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== REQUIRE-TELEGRAM MODAL ===== -->
+  <div class="overlay" id="reqOverlay"></div>
+  <div class="modal modal--sm" id="reqModal" role="dialog" aria-label="Require telegram">
+    <div class="modal__box">
+      <div class="modal__icon">
+        <svg viewBox="0 0 24 24" width="46" height="46" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16.5v.5"/><path d="M9 11l-1.5 1.5L11 16l7-9"/>
+        </svg>
+      </div>
+      <h3 class="modal__title" data-i18n="reqTitle">ابتدا وارد پروفایل شوید</h3>
+      <p class="modal__text" data-i18n="reqText">برای ثبت سفارش باید آیدی تلگرام خود را در پروفایل ثبت کنید. بدون آن امکان خرید وجود ندارد.</p>
+      <button class="btn btn--primary btn--block" id="goProfile" data-i18n="reqGo">رفتن به پروفایل</button>
+      <button class="btn btn--ghost btn--block" id="skipNow" data-i18n="reqLater">بعداً</button>
+    </div>
+  </div>
+
+  <!-- ===== RAFFLE MODAL ===== -->
+  <div class="overlay" id="raffleOverlay"></div>
+  <div class="modal" id="raffleModal" role="dialog" aria-label="Raffle">
+    <div class="modal__box raffle-modal">
+      <button class="icon-btn raffle-modal__close" id="closeRaffle" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <h3 class="raffle-modal__title" id="raffleTitle"></h3>
+      <div class="raffle-wheel" id="raffleWheel">
+        <span class="raffle-pointer" aria-hidden="true"></span>
+        <canvas id="raffleCanvas" width="340" height="340"></canvas>
+        <span class="raffle-hub" aria-hidden="true"><img src="image/logo.png" alt="ZEUS" /></span>
+      </div>
+      <div class="raffle-winner" id="raffleWinner"></div>
+      <div class="raffle-status" id="raffleStatus"></div>
+      <div class="raffle-empty" id="raffleEmpty" hidden data-i18n="raffleEmpty">هنوز بخشی برای قرعه‌کشی تنظیم نشده.</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js?v=74"></script>
+  <script src="js/db.js?v=74"></script>
+  <script src="js/main.js?v=74"></script>
+</body>
+</html>

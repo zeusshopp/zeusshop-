@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>پنل مدیریت | ZEUSSHOP</title>
+  <link rel="icon" type="image/png" href="image/fav.png" />
+  <link rel="stylesheet" href="css/fonts.css?v=74" />
+  <link rel="stylesheet" href="css/style.css?v=74" />
+  <link rel="stylesheet" href="css/admin.css?v=74" />
+</head>
+<body class="admin">
+  <aside class="admin__side" id="sideBar">
+    <div class="admin__brand">
+      <a href="index.html" class="logo">
+        <img class="logo__img" src="image/logo.png" alt="ZEUSSHOP" />
+        <span>ZEUS<b>SHOP</b> <small data-i18n="admBrand">مدیریت</small></span>
+      </a>
+    </div>
+
+    <nav class="admin__nav" data-i18n-root>
+      <a href="#overview" class="is-active">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+        <span data-i18n="admOverview">داشبورد</span>
+      </a>
+      <a href="#inventory">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>
+        <span data-i18n="admInventory">موجودی</span>
+      </a>
+      <a href="#orders">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6h15l-1.5 9H6L4 3H2"/><circle cx="9" cy="20" r="1.7"/><circle cx="17" cy="20" r="1.7"/></svg>
+        <span data-i18n="admOrders">سفارش‌ها</span>
+      </a>
+      <a href="#users">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.4"/><path d="M3.5 20c0-3.2 2.5-5 5.5-5s5.5 1.8 5.5 5"/><path d="M16 5a3.4 3.4 0 0 1 0 6.3M18.5 15.6c1.3.8 2 2 2 3.4"/></svg>
+        <span data-i18n="admUsers">کاربران</span>
+      </a>
+      <a href="#settings">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>
+        <span data-i18n="admSettings">مدیریت</span>
+      </a>
+      <a href="#coupons">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H5a2 2 0 0 1-2-2 2 2 0 0 0 0-4z"/><path d="M13 7v10M9.5 7v10"/></svg>
+        <span>کد تخفیف</span>
+      </a>
+      <a href="#raffle">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3.4M12 17.6V21M3 12h3.4M17.6 12H21M5.6 5.6l2.4 2.4M16 16l2.4 2.4M18.4 5.6 16 8M8 16l-2.4 2.4"/></svg>
+        <span>قرعه‌کشی</span>
+      </a>
+    </nav>
+
+    <div class="admin__foot">
+      <a href="index.html" class="btn btn--ghost btn--block">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 14-5-5 5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-2"/></svg>
+        <span data-i18n="admBackShop">بازگشت به فروشگاه</span>
+      </a>
+      <a href="admin-login.html" id="logoutBtn" class="btn btn--ghost btn--block">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg>
+        <span data-i18n="admLogout">خروج</span>
+      </a>
+    </div>
+  </aside>
+
+  <div class="admin-side-backdrop" id="sideBackdrop"></div>
+
+  <div class="admin__main">
+    <header class="admin__top">
+      <div class="admin__top-title">
+        <button class="admin__burger" id="burger" aria-label="Menu">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h16"/></svg>
+        </button>
+        <h1>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 12h6M12 9v6"/></svg>
+          <span data-i18n="admTitle">پنل مدیریت</span>
+        </h1>
+      </div>
+      <div class="admin__top-meta">
+        <span class="chip-lang" data-i18n="admLang">fa / en</span>
+        <span class="admin__dot"></span>
+      </div>
+    </header>
+
+    <!-- ===== OVERVIEW / STATS ===== -->
+    <section class="panel-card" id="overview">
+      <div class="panel-card__head">
+        <h2 data-i18n="admStatsTitle">آمار کلی</h2>
+        <button class="btn btn--primary btn--sm" id="addSkinBtn">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+          <span data-i18n="admAddSkin">افزودن اسکین</span>
+        </button>
+      </div>
+      <div class="panel-card__body">
+        <div class="stats">
+          <div class="stat">
+            <div class="stat__label">
+              <span class="stat__ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2 3.5 13.5H11l-1 8.5 10-12h-7l1-8Z"/></svg></span>
+              <span data-i18n="admStatSkins">اسکین فعال</span>
+            </div>
+            <div class="stat__num">
+              <b id="statSkins">0</b>
+              <em data-i18n="admStatSkinsU">عدد</em>
+            </div>
+          </div>
+          <div class="stat">
+            <div class="stat__label">
+              <span class="stat__ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6h15l-1.5 9H6L4 3H2"/><circle cx="9" cy="20" r="1.7"/><circle cx="17" cy="20" r="1.7"/></svg></span>
+              <span data-i18n="admStatOrders">سفارش در انتظار</span>
+            </div>
+            <div class="stat__num">
+              <b id="statOrders">0</b>
+              <em data-i18n="admStatOrdersU">سفارش</em>
+            </div>
+          </div>
+          <div class="stat">
+            <div class="stat__label">
+              <span class="stat__ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.4"/><path d="M3.5 20c0-3.2 2.5-5 5.5-5s5.5 1.8 5.5 5"/></svg></span>
+              <span data-i18n="admStatUsers">کاربران</span>
+            </div>
+            <div class="stat__num">
+              <b id="statUsers">0</b>
+              <em data-i18n="admStatUsersU">نفر</em>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== INVENTORY ===== -->
+    <section class="panel-card is-hidden" id="inventory">
+      <div class="panel-card__head">
+        <h2 data-i18n="admInventoryTitle">موجودی اسکین‌ها</h2>
+        <div class="inv-tools">
+          <div class="adm-search">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+            <input type="text" id="invSearch" data-i18n-ph="admInvSearchPh" placeholder="جستجوی اسکین..." />
+          </div>
+          <span class="inv-count" id="invCount">0</span>
+        </div>
+      </div>
+      <div class="panel-card__body">
+        <div class="inventory" id="inventoryGrid"></div>
+        <div class="empty" id="admEmpty" hidden>
+          <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2M8 11h6"/></svg>
+          <p data-i18n="admEmptyTitle">اسکینی ثبت نشده است.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== ORDERS ===== -->
+    <section class="panel-card is-hidden" id="orders">
+      <div class="panel-card__head">
+        <h2 data-i18n="admOrdersTitle">سفارش‌های اخیر</h2>
+        <div class="ord-filters" id="ordFilters">
+          <button class="chip is-active" data-filter="all">همه</button>
+          <button class="chip" data-filter="pending">در انتظار</button>
+          <button class="chip" data-filter="approved">تایید شده</button>
+          <button class="chip" data-filter="rejected">رد شده</button>
+        </div>
+      </div>
+      <div class="panel-card__body">
+        <div id="ordersList"></div>
+        <div class="empty" id="admOrdersEmpty" hidden>
+          <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 6h15l-1.5 9H6L4 3H2"/><circle cx="9" cy="20" r="1.7"/><circle cx="17" cy="20" r="1.7"/></svg>
+          <p data-i18n="admOrdersEmpty">هیچ سفارشی در انتظار نیست.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== USERS ===== -->
+    <section class="panel-card is-hidden" id="users">
+      <div class="panel-card__head">
+        <h2 data-i18n="admUsersTitle">کاربران</h2>
+      </div>
+      <div class="panel-card__body">
+        <div class="users" id="usersList"></div>
+      </div>
+    </section>
+
+    <!-- ===== SETTINGS ===== -->
+    <section class="panel-card is-hidden" id="settings">
+      <div class="panel-card__head">
+        <h2 data-i18n="admSettingsTitle">مدیریت سایت</h2>
+      </div>
+      <div class="panel-card__body">
+        <div class="settings-grid">
+          <div class="settings-card">
+            <h3 data-i18n="admCredsTitle">حساب مدیریت</h3>
+            <div class="db-info" id="dbInfoBox" hidden></div>
+            <div id="credsFields">
+              <div class="field">
+                <label class="field__label" for="setUser" data-i18n="admSetUser">نام کاربری جدید</label>
+                <input class="field__input" id="setUser" dir="ltr" autocomplete="off" />
+              </div>
+              <div class="field">
+                <label class="field__label" for="setPass" data-i18n="admSetPass">رمز عبور جدید</label>
+                <input class="field__input" id="setPass" type="password" dir="ltr" autocomplete="new-password" />
+              </div>
+              <div class="field">
+                <label class="field__label" for="setPass2" data-i18n="admSetPass2">تکرار رمز عبور</label>
+                <input class="field__input" id="setPass2" type="password" dir="ltr" autocomplete="new-password" />
+              </div>
+              <p class="field__hint" id="setHint" data-i18n="admSetHint">رمزعبور جدید باید حداقل ۴ کاراکتر باشد.</p>
+              <button class="btn btn--primary" id="saveCreds" data-i18n="admSaveCreds">ذخیره اطلاعات ورود</button>
+            </div>
+          </div>
+
+          <div class="settings-card settings-card--ann">
+            <div class="settings-card__head">
+              <span class="settings-card__icon settings-card__icon--ann">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.4 5.6a9 9 0 0 1 0 12.8"/></svg>
+              </span>
+              <div class="settings-card__txt">
+                <h3 data-i18n="admAnnTitle">اعلامیه سایت</h3>
+                <p class="settings-note" data-i18n="admAnnNote">این اعلامیه به‌صورت یک مودال، هنگام ورود کاربران در بالای فروشگاه نمایش داده می‌شود.</p>
+              </div>
+            </div>
+            <label class="switch-row">
+              <span>
+                <b data-i18n="admAnnEnabled">فعال بودن اعلامیه</b>
+                <small data-i18n="admAnnEnabledSub">با روشن‌کردن، متن پایین به نمایش درمی‌آید</small>
+              </span>
+              <span class="switch-row__ctl">
+                <span class="ann-pill" id="annPill" data-i18n="admAnnOff">غیرفعال</span>
+                <span class="switch"><input type="checkbox" id="annEnabled" /><i></i></span>
+              </span>
+            </label>
+            <div class="field">
+              <label class="field__label" for="annText" data-i18n="admAnnText">متن اعلامیه</label>
+              <textarea class="field__input ann-textarea" id="annText" rows="3" maxlength="300" data-i18n-ph="admAnnTextPh" placeholder="مثلاً: تحویل سفارش‌ها امروز تا ساعت ۲۱ انجام می‌شود"></textarea>
+              <div class="ann-meta">
+                <span class="ann-emoji" aria-hidden="true">📢</span>
+                <span class="ann-bar" aria-hidden="true"><i id="annBarFill"></i></span>
+                <span class="ann-count" id="annCount">0 / 300</span>
+              </div>
+            </div>
+            <div class="ann-preview" id="annPreviewBox" hidden>
+              <span class="ann-preview__label">پیش‌نمایش</span>
+              <div class="ann-preview__box">
+                <span class="ann-preview__icon"><img src="image/logo.png" alt="ZEUSSHOP" /></span>
+                <div class="ann-preview__body">
+                  <h4 data-i18n="admAnnPreviewTitle">اعلامیه سایت</h4>
+                  <p id="annPreviewText"></p>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn--primary btn--ann" id="saveAnn" data-i18n="admSaveAnn">ذخیره اعلامیه</button>
+          </div>
+
+          <div class="settings-card settings-card--ann">
+            <div class="settings-card__head">
+              <span class="settings-card__icon settings-card__icon--ann">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.5-3.5L5 21"/></svg>
+              </span>
+              <div class="settings-card__txt">
+                <h3 data-i18n="admHeroTitle">تصویر هیرو (بنر اصلی)</h3>
+                <p class="settings-note" data-i18n="admHeroNote">تصویر پس‌زمینه بالای فروشگاه را از اینجا تغییر دهید.</p>
+              </div>
+            </div>
+            <label class="img-picker" for="heroImg">
+              <input type="file" id="heroImg" accept="image/*" hidden />
+              <img class="img-picker__prev" id="heroImgPrev" alt="" hidden />
+              <span class="img-picker__empty" id="heroImgEmpty">
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"/></svg>
+                <b data-i18n="admHeroPick">انتخاب تصویر هیرو</b>
+                <small>PNG / JPG / WebP — روی این کادر بزنید</small>
+              </span>
+            </label>
+            <div class="hero-btns">
+              <button class="btn btn--ghost btn--sm" id="heroReset" data-i18n="admHeroReset">بازگشت به تصویر پیش‌فرض</button>
+              <button class="btn btn--primary btn--ann" id="heroSave" data-i18n="admHeroSave">ذخیره تصویر هیرو</button>
+            </div>
+          </div>
+
+          <div class="settings-card settings-card--ann">
+            <div class="settings-card__head">
+              <span class="settings-card__icon settings-card__icon--ann">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
+              </span>
+              <div class="settings-card__txt">
+                <h3 data-i18n="admBackupTitle">بکاپ و بازیابی دیتابیس</h3>
+                <p class="settings-note" data-i18n="admBackupNote">تمام داده‌ها (اسکین‌ها، سفارش‌ها، کاربران و تنظیمات) را یکجا دانلود کنید یا از فایل بکاپ برگردانید.</p>
+              </div>
+            </div>
+            <div class="hero-btns">
+              <button class="btn btn--primary btn--ann" id="backupBtn">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>
+                <span data-i18n="admBackupGo">دریافت بکاپ</span>
+              </button>
+              <button class="btn btn--ghost btn--ann" id="restoreBtn">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 21V9M7 14l5-5 5 5M4 3h16"/></svg>
+                <span data-i18n="admRestoreGo">بازیابی از بکاپ</span>
+              </button>
+              <input type="file" id="restoreFile" accept=".json,application/json" hidden />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== COUPONS (کد تخفیف) ===== -->
+    <section class="panel-card is-hidden" id="coupons">
+      <div class="panel-card__head">
+        <h2>کدهای تخفیف</h2>
+      </div>
+      <div class="panel-card__body">
+        <div class="settings-grid">
+          <div class="settings-card">
+            <div class="settings-card__head">
+              <span class="settings-card__icon settings-card__icon--ann">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              </span>
+              <div class="settings-card__txt">
+                <h3>ساخت کد جدید</h3>
+                <p class="settings-note">یک کد بساز و به یک کاربر خاص بده؛ فقط همان یک نفر (با همان تلگرام) می‌تواند استفاده کند.</p>
+              </div>
+            </div>
+            <div class="coupon-form">
+              <div class="field">
+                <label class="field__label" for="cpCode">کد تخفیف</label>
+                <input class="field__input" id="cpCode" dir="ltr" autocomplete="off" placeholder="مثلاً WELCOME10" />
+              </div>
+              <div class="field">
+                <label class="field__label" for="cpDisc">درصد تخفیف</label>
+                <input class="field__input" id="cpDisc" type="number" min="1" max="99" step="1" dir="ltr" placeholder="10" />
+              </div>
+              <div class="field">
+                <label class="field__label" for="cpUser">تلگرام کاربر (فقط همین یک نفر)</label>
+                <input class="field__input" id="cpUser" dir="ltr" autocomplete="off" placeholder="@username" />
+              </div>
+              <button class="btn btn--primary" id="cpAdd">ساخت کد</button>
+            </div>
+          </div>
+          <div class="settings-card">
+            <div class="settings-card__head">
+              <span class="settings-card__icon settings-card__icon--ann">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H5a2 2 0 0 1-2-2 2 2 0 0 0 0-4z"/><path d="M13 7v10M9.5 7v10"/></svg>
+              </span>
+              <div class="settings-card__txt">
+                <h3>کدهای ساخته‌شده</h3>
+                <p class="settings-note">کد استفاده‌شده را می‌توانید غیرفعال یا حذف کنید.</p>
+              </div>
+            </div>
+            <div class="coupon-list" id="couponList"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== RAFFLE (قرعه‌کشی) ===== -->
+    <section class="panel-card is-hidden" id="raffle">
+      <div class="panel-card__head">
+        <h2>قرعه‌کشی</h2>
+      </div>
+      <div class="panel-card__body">
+        <div class="raffle-admin">
+          <div class="raffle-admin__forms">
+            <div class="settings-card">
+              <div class="settings-card__head">
+                <span class="settings-card__icon settings-card__icon--ann">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3.4M12 17.6V21M3 12h3.4M17.6 12H21"/></svg>
+                </span>
+                <div class="settings-card__txt">
+                  <h3>تنظیمات گردونه</h3>
+                  <p class="settings-note">فقط از این پنل می‌توان گردونه را چرخاند؛ کاربران در هدر سایت آن را زنده تماشا می‌کنند.</p>
+                </div>
+              </div>
+              <div class="rf-toggle-row">
+                <label class="field__label" for="rfToggle">وضعیت قرعه‌کشی</label>
+                <span class="rf-state" id="rfState">فعال</span>
+                <label class="switch">
+                  <input type="checkbox" id="rfToggle" checked />
+                  <span class="switch__knob"></span>
+                </label>
+              </div>
+              <p class="field__hint" id="rfStateHint">هنگامی که غیرفعال باشد، کاربران در سایت پیام «قرعه‌کشی غیرفعال است» می‌بینند و گردونه باز نمی‌شود.</p>
+              <div class="field">
+                <label class="field__label" for="rfTitle">عنوان قرعه‌کشی</label>
+                <input class="field__input" id="rfTitle" maxlength="60" placeholder="قرعه‌کشی" />
+              </div>
+              <div class="field">
+                <label class="field__label">حالت انتخاب برنده</label>
+                <div class="deliv-opt" id="rfModeOpt">
+                  <label class="chip"><input type="radio" name="rfMode" value="random" checked /><span>تصادفی</span></label>
+                  <label class="chip"><input type="radio" name="rfMode" value="manual" /><span>انتخاب دستی</span></label>
+                </div>
+              </div>
+              <div class="field" id="rfWinnerWrap" hidden>
+                <label class="field__label" for="rfWinnerSel">بخش برنده</label>
+                <select class="field__input" id="rfWinnerSel"></select>
+              </div>
+              <button class="btn btn--primary" id="rfSave">ذخیره تنظیمات</button>
+              <p class="field__hint" id="rfHint"></p>
+            </div>
+
+            <div class="settings-card">
+              <div class="settings-card__head">
+                <span class="settings-card__icon settings-card__icon--ann">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+                </span>
+                <div class="settings-card__txt">
+                  <h3>بخش‌های گردونه <span class="rf-count" id="rfCount"></span></h3>
+                  <p class="settings-note">هر بخش یعنی یک اسم روی گردونه. حداقل ۲ و حداکثر ۲۴ بخش.</p>
+                </div>
+              </div>
+              <div class="rf-entries" id="rfEntries"></div>
+              <button class="btn btn--ghost btn--sm" id="rfAddEntry">افزودن بخش</button>
+            </div>
+          </div>
+
+          <aside class="raffle-admin__preview">
+            <div class="raffle-wheel">
+              <span class="raffle-pointer" aria-hidden="true"></span>
+              <canvas id="rfPreview" width="340" height="340"></canvas>
+              <span class="raffle-hub" aria-hidden="true"><img src="image/logo.png" alt="ZEUS" /></span>
+            </div>
+            <p class="raffle-preview__hint">پیش‌نمایش زنده — همان چیزی که کاربران می‌بینند</p>
+            <div class="raffle-actions">
+              <button class="btn btn--primary" id="rfSpin">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+                <span>چرخاندن گردونه</span>
+              </button>
+              <button class="btn btn--ghost" id="rfReset">پاک‌کردن برنده</button>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== ADD SKIN MODAL (only place) ===== -->
+  <div class="overlay" id="skinOverlay"></div>
+  <div class="modal" id="skinModal" role="dialog" aria-modal="true" aria-label="افزودن اسکین">
+    <form class="modal__box" id="skinForm" novalidate>
+      <div class="modal__head">
+        <h3>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          <span id="skinModalTitle" data-i18n="admAddSkinTitle">افزودن اسکین جدید</span>
+        </h3>
+        <button type="button" class="icon-btn" id="closeSkinModal" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <div class="form-grid">
+          <div class="field field--full">
+            <label class="field__label" data-i18n="admFName">نام اسکین</label>
+            <input class="field__input" id="fName" required data-i18n-ph="admFNamePh" placeholder="مثل AWP | Dragon Lore" />
+          </div>
+          <div class="field">
+            <label class="field__label" data-i18n="admFType">نوع اسکین</label>
+            <select class="field__input" id="fType">
+              <option>Normal</option>
+              <option>StatTrak™</option>
+              <option>Souvenir</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field__label" data-i18n="admFWeapon">نوع گان</label>
+            <select class="field__input" id="fWeapon" required>
+              <option value="Knife">Knife</option>
+              <option value="Pistol">Pistol</option>
+              <option value="Machineguns">Machineguns</option>
+              <option value="Shotgun">Shotgun</option>
+              <option value="SMG">SMG</option>
+              <option value="Rifle">Rifle</option>
+              <option value="Snipers">Snipers</option>
+              <option value="GLOVES">GLOVES</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field__label" data-i18n="admFWear">وضعیت / Wear</label>
+            <select class="field__input" id="fWear">
+              <option>Factory New</option>
+              <option>Minimal Wear</option>
+              <option>Field-Tested</option>
+              <option>Well-Worn</option>
+              <option>Battle-Scarred</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field__label" data-i18n="admFRarity">Rarity</label>
+            <select class="field__input" id="fRarity">
+              <option value="consumer">⚪ Consumer Grade</option>
+              <option value="industrial">🩵 Industrial Grade</option>
+              <option value="milspec">🔵 Mil-Spec Grade</option>
+              <option value="restricted">🟣 Restricted</option>
+              <option value="classified">🌸 Classified</option>
+              <option value="covert">🔴 Covert</option>
+              <option value="extraordinary">🟡 Extraordinary</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field__label" data-i18n="admFPrice">قیمت (تومان)</label>
+            <input class="field__input" id="fPrice" type="number" min="1" step=".01" required dir="ltr" placeholder="5200.00" />
+          </div>
+          <div class="field">
+            <label class="field__label" data-i18n="admFDisc">تخفیف</label>
+            <div class="disc-input">
+              <label class="switch switch--xs"><input type="checkbox" id="fDisOn" /><i></i></label>
+              <input class="field__input" id="fDiscount" type="number" min="0" max="99" step="1" dir="ltr" placeholder="٪" />
+            </div>
+            <p class="disc-preview" id="fDiscPreview" hidden></p>
+            <p class="field__hint" data-i18n="admFDiscHint">روشن کردن تخفیف، قیمت قدیم (خط‌خورده) و قیمت نمایشی را با هم روی کارت نشان می‌دهد.</p>
+          </div>
+          <div class="field field--full">
+            <label class="field__label" data-i18n="admFDeliv">زمان تحویل این اسکین</label>
+            <div class="deliv-opt" id="delivWrap">
+              <label class="chip"><input type="radio" name="fDeliv" value="immediate" checked /><span>تحویل فوری</span></label>
+              <label class="chip"><input type="radio" name="fDeliv" value="days" /><span>تحویل پس از چند روز</span></label>
+            </div>
+            <div class="deliv-days" id="delivDaysWrap" hidden>
+              <input class="field__input" id="fDelivDays" type="number" min="1" max="30" step="1" dir="ltr" value="2" />
+              <span class="field__hint" data-i18n="admFDelivDaysHint">تعداد روز (۱ تا ۳۰)</span>
+            </div>
+          </div>
+          <input type="hidden" id="fId" />
+          <div class="field field--full">
+            <label class="field__label" data-i18n="admFImg">تصویر اسکین</label>
+            <label class="img-picker" for="fImg">
+              <input type="file" id="fImg" accept="image/*" hidden />
+              <img class="img-picker__prev" id="fImgPrev" alt="" hidden />
+              <span class="img-picker__empty" id="fImgEmpty">
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"/></svg>
+                <b>انتخاب تصویر</b>
+                <small>PNG / JPG / WebP — روی این کادر بزنید</small>
+              </span>
+            </label>
+            <p class="field__hint" data-i18n="admFImgHint">در صورت خالی ماندن، تصویر پیش‌فرض قرار می‌گیرد.</p>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn--ghost" id="cancelSkin" data-i18n="admCancel">انصراف</button>
+          <button type="submit" class="btn btn--primary" data-i18n="admSaveSkin">ثبت اسکین</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js?v=74"></script>
+  <script src="js/db.js?v=74"></script>
+  <script src="js/main.js?v=74"></script>
+  <script src="js/admin.js?v=74"></script>
+</body>
+</html>

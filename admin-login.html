@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ورود مدیریت | ZEUSSHOP</title>
+  <link rel="icon" type="image/png" href="image/fav.png" />
+  <link rel="stylesheet" href="css/fonts.css?v=74" />
+  <link rel="stylesheet" href="css/style.css?v=74" />
+  <link rel="stylesheet" href="css/admin.css?v=74" />
+</head>
+<body class="login">
+  <main class="login__wrap">
+    <div class="login__brand">
+      <a href="index.html" class="logo">
+        <img class="logo__img" src="image/logo.png" alt="ZEUSSHOP" />
+        <span>ZEUS<b>SHOP</b> <small data-i18n="loginBrand">ورود مدیریت</small></span>
+      </a>
+    </div>
+
+    <form class="login__card" id="loginForm" novalidate>
+      <h1 class="login__title" data-i18n="loginTitle">ورود به پنل مدیریت</h1>
+      <p class="login__sub" data-i18n="loginSub">برای مدیریت اسکین‌ها و سفارش‌ها وارد شوید.</p>
+
+      <div class="field">
+        <label class="field-label" for="adminUser">ایمیل مدیریت</label>
+        <input class="field-input" type="email" id="adminUser" autocomplete="username" placeholder="ایمیل خود را وارد کنید" />
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="adminPass" data-i18n="loginPass">رمز عبور</label>
+        <input class="field-input" type="password" id="adminPass" autocomplete="current-password" placeholder="رمز خود را وارد کنید" />
+      </div>
+
+      <div class="login__err" id="loginErr" role="alert"></div>
+
+      <button class="btn btn--primary btn--block" type="submit" id="loginBtn" data-i18n="loginBtn">ورود</button>
+    </form>
+
+    <a href="index.html" class="login__back" data-i18n="loginBack">← بازگشت به فروشگاه</a>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js?v=74"></script>
+  <script src="js/db.js?v=74"></script>
+  <script src="js/main.js?v=74"></script>
+  <script src="js/admin.js?v=74"></script>
+</body>
+</html>
