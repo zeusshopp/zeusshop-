@@ -1093,27 +1093,6 @@ select.field-input option, select.field__input option {
 
 /* Small tablet & large phone */
 @media (max-width: 860px) {
-  .admin__burger { display: grid; }
-  .admin__close { display: grid; }
-  .admin__side {
-    position: fixed; inset: 0; z-index: 90;
-    width: 100%; max-width: 100%; height: 100vh; height: 100dvh;
-    margin: 0; border-radius: 0; border: 0;
-    transform: translateY(-8px);
-    opacity: 0; pointer-events: none;
-    transition: transform .28s ease, opacity .28s ease;
-    padding: calc(20px + env(safe-area-inset-top, 0px)) 18px 24px;
-    background: rgba(11, 9, 5, .86);
-    -webkit-backdrop-filter: blur(16px) saturate(1.1);
-    backdrop-filter: blur(16px) saturate(1.1);
-    box-shadow: none;
-    overflow-y: auto;
-    box-shadow: inset 0 0 80px rgba(240, 194, 75, .04);
-  }
-  .admin__side.is-open { transform: translateY(0); opacity: 1; pointer-events: auto; }
-  .admin__nav { padding-top: 18px; }
-  .admin__nav a { padding: 14px 16px; font-size: .95rem; }
-  .admin__foot .btn { padding: 12px 16px; }
   .admin__main { padding: 18px 14px 60px; height: auto; overflow: visible; display: block; }
   .admin__top { position: static; flex-wrap: wrap; }
   .panel-card { display: block; overflow: visible; }
@@ -1126,6 +1105,34 @@ select.field-input option, select.field__input option {
   }
   .admin-side-backdrop.is-on { opacity: 1; pointer-events: auto; }
   .settings-grid { grid-template-columns: 1fr; }
+}
+
+/* Phone — burger & overlay menu only here */
+@media (max-width: 640px) {
+  .admin__burger { display: grid !important; }
+  .admin__close { display: grid; }
+  .admin__side {
+    position: fixed; inset: 0; z-index: 90;
+    width: 100%; max-width: 100%; height: 100vh; height: 100dvh;
+    margin: 0; border-radius: 0; border: 0;
+    transform: translateY(-8px);
+    opacity: 0; pointer-events: none;
+    transition: transform .28s ease, opacity .28s ease;
+    padding: calc(20px + env(safe-area-inset-top, 0px)) 18px 24px;
+    background: rgba(11, 9, 5, .86);
+    -webkit-backdrop-filter: blur(16px) saturate(1.1);
+    backdrop-filter: blur(16px) saturate(1.1);
+    box-shadow: inset 0 0 80px rgba(240, 194, 75, .04);
+    overflow-y: auto;
+  }
+  .admin__side.is-open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+  .admin__nav { padding-top: 18px; }
+  .admin__nav a { padding: 14px 16px; font-size: .95rem; }
+  .admin__foot .btn { padding: 12px 16px; }
+}
+/* hard guarantee: never show the burger off phones */
+@media (min-width: 641px) {
+  .admin__burger, .admin__close { display: none !important; }
 }
 
 @media (max-width: 640px) {

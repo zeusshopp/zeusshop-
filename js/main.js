@@ -1201,6 +1201,7 @@ if (profileModal) {
     document.addEventListener("keydown", e => {
       if (e.key === "Escape" && !hamburgerMenu.hidden) closeHamburger();
     });
+    window.addEventListener("resize", () => { if (window.innerWidth > 520) closeHamburger(); });
   }
   document.addEventListener("click", e => {
     if (searchbar.classList.contains("is-open") && !searchbar.contains(e.target)) closeSearch();

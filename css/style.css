@@ -1561,8 +1561,6 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
   html.is-switching * { animation: none !important; }
   .grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
   .header__in { height: 52px; gap: 12px; padding: 0 12px !important; }
-  .hamburger { display: grid; }
-  .inv-btn { display: none; }
   .logo svg { width: 24px; height: 24px; }
   .logo__img { width: 26px; height: 26px; border-radius: 8px; }
   .icon-btn { width: 36px; height: 36px; }
@@ -1638,6 +1636,16 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
   .bought__gun { width: 32px; height: 32px; flex-basis: 32px; }
   .bought__meta { max-width: 120px; }
   .latest__label { font-size: .72rem; }
+}
+
+/* --- Mobile hamburger (phones only) --- */
+@media (max-width: 520px) {
+  .hamburger { display: grid !important; }
+  .inv-btn { display: none; }
+}
+/* hard guarantee: never show the burger off phones */
+@media (min-width: 521px) {
+  .hamburger, .hamburger.is-open { display: none !important; }
 }
 
 /* --- Very small phones (max-width 400px) --- */
