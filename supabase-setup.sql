@@ -243,3 +243,75 @@ create policy "claims public read" on public.coupon_claims
   for select using (true);
 create policy "claims public delete" on public.coupon_claims
   for delete using (public.is_admin());
+
+-- -------------------------------------------------------------
+-- 7) REPAIR (order & users policies) + ANTI-SPAM
+--    Run this if any of these happen:
+--      • Admin approval shows "در دیتابیس ذخیره نشد"
+--      • New orders don't reach the panel / "کاربران فعال" stays 0
+--    It re-adds the missing coupon column + RLS policies (safe to re-run),
+--    makes "id" a real primary key, and installs the anti-spam guard so a
+--    buyer can't flood orders (max 3 pending, min 30s between orders).
+-- -------------------------------------------------------------
+alter table public.orders add column if not exists coupon text not null default '';
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conrelid = 'public.orders'::regclass and contype = 'p') then
+    execute 'alter table public.orders add primary key (id)';
+  end if;
+  if not exists (select 1 from pg_indexes where schemaname = 'public' and tablename = 'orders' and indexname = 'idx_orders_telegram') then
+    execute 'create index idx_orders_telegram on public.orders (telegram)';
+  end if;
+  if not exists (select 1 from pg_indexes where schemaname = 'public' and tablename = 'orders' and indexname = 'idx_orders_status') then
+    execute 'create index idx_orders_status on public.orders (status)';
+  end if;
+end $$;
+
+-- re-create the ORDERS policies (they may have been dropped on recreated tables)
+alter table public.orders enable row level security;
+drop policy if exists "orders public insert" on public.orders;
+drop policy if exists "orders public insert guarded" on public.orders;
+drop policy if exists "orders public read approved" on public.orders;
+drop policy if exists "orders admin read" on public.orders;
+drop policy if exists "orders admin change" on public.orders;
+drop policy if exists "orders admin delete" on public.orders;
+
+create policy "orders public read approved" on public.orders
+  for select using (status = 'approved');
+create policy "orders admin read" on public.orders
+  for select using (public.is_admin());
+create policy "orders admin change" on public.orders
+  for update using (public.is_admin()) with check (public.is_admin());
+create policy "orders admin delete" on public.orders
+  for delete using (public.is_admin());
+
+-- anti-spam RPC: allowed = less than 3 pending orders AND last order older than 30s
+create or replace function public.checkout_allowed(tg text)
+returns boolean language sql stable security definer as $$
+  select
+    (select count(*) from public.orders where telegram = tg and status = 'pending') < 3
+    and (select coalesce(max(date), '-infinity') from public.orders where telegram = tg)
+        < now() - interval '30 seconds'
+$$;
+revoke execute on function public.checkout_allowed(text) from public, anon, authenticated;
+grant execute on function public.checkout_allowed(text) to anon, authenticated;
+
+-- orders may ONLY be inserted when the anti-spam check passes
+create policy "orders public insert guarded" on public.orders
+  for insert with check (public.checkout_allowed(telegram));
+
+-- make sure USERS inserts still reach the DB (active-user counter)
+alter table public.users enable row level security;
+drop policy if exists "users public insert" on public.users;
+drop policy if exists "users admin read" on public.users;
+drop policy if exists "users admin change" on public.users;
+drop policy if exists "users admin delete" on public.users;
+create policy "users public insert" on public.users
+  for insert with check (true);
+create policy "users admin read" on public.users
+  for select using (public.is_admin());
+create policy "users admin change" on public.users
+  for update using (public.is_admin()) with check (public.is_admin());
+create policy "users admin delete" on public.users
+  for delete using (public.is_admin());

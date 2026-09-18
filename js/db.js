@@ -569,19 +569,34 @@ function dbSyncOrders(list) {
    ---------------------------------------------------------- */
 async function dbSaveOrderDirect(o) {
   if (!DB_MODE || !supa || !DB_READY) return null;
+  const base = {
+    id: Number(o.id) || 0, telegram: String(o.telegram || ""),
+    items: Array.isArray(o.items) ? o.items : [],
+    total: Number(o.total) || 0, status: String(o.status || "pending"),
+    date: o.date ? new Date(o.date).toISOString() : new Date().toISOString(),
+  };
+  const coupon = String(o.coupon || "").trim().toUpperCase();
+  const attempt = row => supa.from("orders")
+    .upsert([row], { onConflict: "id" })
+    .then(r => r.error ? (r.error.message || "err") : (r.data && r.data.length > 0 ? null : "no-rows-affected"))
+    .catch(e => (e && e.message) || "err");
   try {
-    const row = {
-      id: Number(o.id) || 0, telegram: String(o.telegram || ""),
-      items: Array.isArray(o.items) ? o.items : [],
-      total: Number(o.total) || 0, status: String(o.status || "pending"),
-      coupon: String(o.coupon || "").trim().toUpperCase(),
-      date: o.date ? new Date(o.date).toISOString() : new Date().toISOString(),
-    };
-    const { data, error } = await supa.from("orders").upsert([row], { onConflict: "id" });
-    if (error) return error.message;
-    if (!data || !Array.isArray(data) || data.length === 0) return "no-rows-affected";
-    return null;
-  } catch (e) { return e.message || "err"; }
+    /* if the (recreated) orders table has no coupon column yet, retry without it */
+    let err = await attempt(coupon ? { ...base, coupon } : base);
+    if (err && coupon && /coupon/i.test(err)) err = await attempt(base);
+    return err;
+  } catch (e) { return (e && e.message) || "err"; }
+}
+/* anti-spam server-side gate (RPC installed by supabase-setup.sql part 7).
+   Returns { ok: false, reason } when the insert policy would reject; returns
+   { ok: true } when allowed or when the RPC isn't installed yet (graceful). */
+async function dbCheckoutAllowed(tg) {
+  if (!DB_MODE || !supa || !DB_READY || !tg) return { ok: true };
+  try {
+    const { data, error } = await supa.rpc("checkout_allowed", { tg: String(tg).trim() });
+    if (error) return { ok: true, probe: error.message };         /* RPC missing → no server gate */
+    return data === true ? { ok: true } : { ok: false, reason: "limit" };
+  } catch (e) { return { ok: true, probe: (e && e.message) || "err" }; }
 }
 async function dbDeleteOrderDirect(id) {
   if (!DB_MODE || !supa || !DB_READY) return null;

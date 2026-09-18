@@ -79,6 +79,8 @@ const I18N = {
     lblName: "اسم گان", lblWeapon: "گان", lblType: "نوع",
     lblWear: "وضعیت", lblRarity: "راریتی", lblDelivery: "تحویل",
     tCheckout: "سفارش ثبت شد! پیام آن در تلگرام مدیریت (<b>@ZEUS_ADMIN0</b>) ارسال شد.",
+    ckWaitSec: "برای جلوگیری از اسپم، {s} ثانیه صبر کن.",
+    ckTooFast: "سفارشات شما زیاد است؛ لطفاً کمی صبر کن.",
     tProfileFirst: "ابتدا در پروفایل آیدی تلگرام ثبت کنید.",
     navInv: "اینونتوری", invTitle: "اینونتوری من", invEmptyTitle: "هنوز آیتمی در اینونتوری شما نیست.",
     invLoading: "در حال بارگذاری اینونتوری...",
@@ -143,6 +145,8 @@ const I18N = {
     lblName: "Skin", lblWeapon: "Weapon", lblType: "Type",
     lblWear: "Wear", lblRarity: "Rarity", lblDelivery: "Delivery",
     tCheckout: "Order placed! Sent to admin Telegram (<b>@ZEUS_ADMIN0</b>).",
+    ckWaitSec: "Wait {s}s to prevent spam.",
+    ckTooFast: "Too many orders — please wait a moment.",
     tProfileFirst: "Save your Telegram ID in your profile first.",
 navInv: "Inventory", invTitle: "My Inventory", invEmptyTitle: "No items in your inventory yet.",
     invLoading: "Loading inventory...",
@@ -1074,8 +1078,17 @@ if (profileModal) {
   if (couponRemoveBtn) couponRemoveBtn.addEventListener("click", () => { appliedCoupon = null; if (couponInput) couponInput.value = ""; renderCart(); });
 
   $id("checkoutBtn").addEventListener("click", () => {
-    requireTelegram(() => {
+    requireTelegram(async () => {
       const tg = getTelegram();
+      const CD_MS = 30000;
+      const tgKey = "zs_last_order_" + (String(tg || "").trim().replace(/[^\w@+]/gi, "") || "anon");
+      const lastTs = Number(localStorage.getItem(tgKey) || 0);
+      const wait = lastTs ? CD_MS - (Date.now() - lastTs) : 0;
+      if (wait > 0) { showToast(t("ckWaitSec", { s: Math.ceil(wait / 1000) }), true); return; }
+      if (typeof dbCheckoutAllowed === "function") {
+        const gate = await dbCheckoutAllowed(tg);
+        if (gate && gate.ok === false) { showToast(t("ckTooFast"), true); return; }
+      }
       const EMOJIS = ["✅", "❤️‍🔥", "💸", "🛍️", "⭐", "💎", "🎁", "⚡", "🔫", "🛡️"];
       const items = cart.map((n, idx) => {
         const s = findSkin(n);
@@ -1132,6 +1145,10 @@ if (profileModal) {
       hideToast();
       window.open("https://t.me/ZEUS_ADMIN0?text=" + msg, "_blank", "noopener");
       showToast(t("tCheckout", { tg }));
+      localStorage.setItem(tgKey, String(Date.now()));
+      const cb = $id("checkoutBtn");
+      cb.disabled = true;
+      setTimeout(() => { cb.disabled = false; }, CD_MS);
     });
   });
 
