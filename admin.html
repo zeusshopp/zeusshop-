@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>پنل مدیریت | ZEUSSHOP</title>
   <link rel="icon" type="image/png" href="image/fav.png" />
-  <link rel="stylesheet" href="css/fonts.css?v=84" />
-  <link rel="stylesheet" href="css/style.css?v=84" />
-  <link rel="stylesheet" href="css/admin.css?v=84" />
+  <link rel="stylesheet" href="css/fonts.css?v=86" />
+  <link rel="stylesheet" href="css/style.css?v=86" />
+  <link rel="stylesheet" href="css/admin.css?v=86" />
 </head>
 <body class="admin">
   <aside class="admin__side" id="sideBar">
@@ -247,6 +247,27 @@
               </div>
             </div>
             <button class="btn btn--primary btn--ann" id="saveAnn" data-i18n="admSaveAnn">ذخیره اعلامیه</button>
+          </div>
+
+          <div class="settings-card settings-card--ann">
+            <div class="settings-card__head">
+              <span class="settings-card__icon settings-card__icon--ann">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20M6 15h4"/></svg>
+              </span>
+              <div class="settings-card__txt">
+                <h3 data-i18n="admPayTitle">اطلاعات کارت پرداخت</h3>
+                <p class="settings-note" data-i18n="admPayNote">شماره کارت و نام صاحب کارتی که هنگام خرید برای کاربر نمایش داده می‌شود.</p>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field__label" for="payCard" data-i18n="admPayCard">شماره کارت</label>
+              <input class="field__input" id="payCard" dir="ltr" autocomplete="off" inputmode="numeric" data-i18n-ph="admPayCardPh" placeholder="6037-XXXX-XXXX-XXXX" />
+            </div>
+            <div class="field">
+              <label class="field__label" for="payHolder" data-i18n="admPayHolder">نام صاحب کارت</label>
+              <input class="field__input" id="payHolder" autocomplete="off" data-i18n-ph="admPayHolderPh" placeholder="مثلاً: علی رضایی" />
+            </div>
+            <button class="btn btn--primary btn--ann" id="savePay" data-i18n="admPaySave">ذخیره کارت</button>
           </div>
 
           <div class="settings-card settings-card--ann">
@@ -540,9 +561,9 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/supabase-config.js?v=84"></script>
-  <script src="js/db.js?v=84"></script>
-  <script src="js/main.js?v=84"></script>
-  <script src="js/admin.js?v=84"></script>
+  <script src="js/supabase-config.js?v=86"></script>
+  <script src="js/db.js?v=86"></script>
+  <script src="js/main.js?v=86"></script>
+  <script src="js/admin.js?v=86"></script>
 </body>
 </html>

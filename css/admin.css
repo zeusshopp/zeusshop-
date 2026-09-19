@@ -833,6 +833,12 @@ body.admin {
   background: rgba(240, 194, 75, .045);
   border: 1px solid rgba(240, 194, 75, .12);
 }
+.order-item--receipt { align-items: center; background: rgba(61, 220, 132, .07); border-color: rgba(61, 220, 132, .3); }
+.order-item--receipt::before { display: none; }
+.order-item--receipt img {
+  width: 26px; height: 26px; object-fit: cover; border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.15); margin-inline-start: 4px;
+}
 .order-item::before {
   content: ""; width: 7px; height: 7px; border-radius: 50%;
   background: var(--oc, var(--accent));

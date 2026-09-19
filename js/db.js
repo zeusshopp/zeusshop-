@@ -469,7 +469,7 @@ function deleteOrderItem(ordId, itemIdx) {
 function addToInventory(tg, items) {
   tg = String(tg || "").trim();
   if (!tg || !Array.isArray(items) || !items.length) return;
-  const entries = items.map(it => ({
+  const entries = items.filter(it => it && !it.special).map(it => ({
     id: Date.now() + Math.floor(Math.random() * 1000),
     telegram: tg, name: it.name, price: Number(it.price) || 0,
     img: it.img || "", weapon: it.weapon || "", wear: it.wear || "",
@@ -612,7 +612,7 @@ async function dbAddInventoryDirect(tg, items) {
   tg = String(tg || "").trim();
   if (!tg || !Array.isArray(items) || !items.length) return null;
   try {
-    const mapped = items.map(it => ({
+    const mapped = items.filter(it => it && !it.special).map(it => ({
       telegram: tg, name: String(it && it.name || ""), price: Number(it && it.price) || 0,
       img: String(it && it.img || ""), weapon: String(it && it.weapon || ""),
       wear: String(it && it.wear || ""), rarity: String(it && it.rarity || ""),

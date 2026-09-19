@@ -278,6 +278,13 @@ if (adminMain) {
       const st = o.status || "pending";
       const meta = ORD_LBL[st] || ORD_LBL.pending;
       const items = (o.items || []).map((it, idx) => {
+        let receiptHtml = "";
+        if (!it || !it.name) {
+          if (it && it.special === "receipt" && it.code) {
+            receiptHtml = `<span class="order-item order-item--receipt" title="${FA("فیش پرداخت", "Payment receipt")}">📎 ${esc(it.code)}${it.img ? `<img src="${esc(it.img)}" alt="" />` : ""}</span>`;
+          }
+          return receiptHtml;
+        }
         const r = RARITY[it.rarity] ? RARITY[it.rarity].color : "#f0c24b";
         return `<span class="order-item" style="--oc:${r}">${esc(it.name)}<em>${twoFix(it.price)} ${unitTxt()}</em><button class="order-item__x" data-del-item="${o.id}|${idx}" title="${FA("حذف این آیتم", "Remove item")}">×</button></span>`;
       }).join("");
@@ -1037,6 +1044,32 @@ const tog = e.target.closest("[data-cp-toggle]");
       if (annText) annText.value = na.text || "";
       syncAnnUI();
       syncAnnState();
+    });
+  }
+
+  /* ---------- payment card settings ---------- */
+  const payCard = $id("payCard");
+  const payHolder = $id("payHolder");
+  const savePayBtn = $id("savePay");
+  if (savePayBtn) {
+    function loadPaySettings() {
+      if (payCard) payCard.value = typeof getSetting === "function" ? getSetting("pay_card") : "";
+      if (payHolder) payHolder.value = typeof getSetting === "function" ? getSetting("pay_card_name") : "";
+    }
+    loadPaySettings();
+    document.addEventListener("zeus-db", e => {
+      if ((e.detail && e.detail.type) === "settings") loadPaySettings();
+    });
+    savePayBtn.addEventListener("click", () => {
+      const card = payCard ? payCard.value.trim() : "";
+      const holder = payHolder ? payHolder.value.trim() : "";
+      if (!/^[0-9-]+$/.test(card)) { showToast(FA("فقط عدد و خط تیره وارد کنید.", "Digits and dashes only."), true); if (payCard) payCard.focus(); return; }
+      if (!card) { showToast(FA("شماره کارت را وارد کنید.", "Enter the card number."), true); if (payCard) payCard.focus(); return; }
+      if (typeof saveSetting === "function") {
+        saveSetting("pay_card", card);
+        saveSetting("pay_card_name", holder);
+      }
+      showToast(FA("اطلاعات کارت ذخیره شد ✓", "Card info saved ✓"));
     });
   }
 

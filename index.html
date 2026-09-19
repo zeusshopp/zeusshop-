@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#070604" />
   <title>ZEUSSHOP — خرید و فروش اسکین CS2</title>
   <link rel="icon" type="image/png" href="image/fav.png" />
-  <link rel="stylesheet" href="css/fonts.css?v=84" />
-  <link rel="stylesheet" href="css/style.css?v=84" />
-  <link rel="stylesheet" href="css/admin.css?v=84" />
+  <link rel="stylesheet" href="css/fonts.css?v=86" />
+  <link rel="stylesheet" href="css/style.css?v=86" />
+  <link rel="stylesheet" href="css/admin.css?v=86" />
 </head>
 <body>
 
@@ -338,6 +338,67 @@
     </div>
   </div>
 
+  <!-- ===== PAYMENT MODAL ===== -->
+  <div class="overlay" id="payOverlay"></div>
+  <div class="modal" id="payModal" role="dialog" aria-label="Payment">
+    <div class="modal__box pay-modal">
+      <div class="modal__head">
+        <h3 data-i18n="payTitle">پرداخت سفارش</h3>
+        <button class="icon-btn" id="closePay" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="pay-body">
+        <div class="pay-step" id="payStep1">
+          <p class="pay-sub" data-i18n="paySub">مبلغ سفارش را به کارت زیر واریز کن، بعد عکس «فیش» را آپلود کن.</p>
+          <div class="pay-items" id="payItems"></div>
+          <div class="pay-info-note">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="10"/></svg>
+            <span data-i18n="payNote">بعد از واریز، عکس فیش را اینجا آپلود کن تا کد پیگیری بگیری.</span>
+          </div>
+          <div class="pay-card">
+            <div class="pay-card__row">
+              <span class="pay-card__label" data-i18n="payCardLbl">واریز به کارت:</span>
+              <b class="pay-card__num" id="payCardNum" dir="ltr">6037-0000-0000-0000</b>
+            </div>
+            <div class="pay-card__row">
+              <span class="pay-card__label" data-i18n="payCardNameLbl">به نام:</span>
+              <b class="pay-card__name" id="payCardName">—</b>
+            </div>
+          </div>
+          <div class="pay-upload">
+            <input type="file" id="payFile" accept="image/*" hidden />
+            <button class="pay-drop" id="payDrop" type="button">
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+              <b data-i18n="payDropTxt">آپلود فیش واریز</b>
+              <small data-i18n="payDropSub">عکس فیش — روی کادر بزن یا بکش و رها کن</small>
+            </button>
+            <div class="pay-prev" id="payPrevWrap" hidden>
+              <img id="payPrev" alt="receipt" />
+              <button class="pay-prev__clear" id="payClear" type="button" aria-label="Remove">✕</button>
+            </div>
+          </div>
+          <button class="btn btn--primary btn--block pay-submit" id="paySubmit" data-i18n="paySubmit" disabled>ثبت فیش و دریافت کد پیگیری</button>
+        </div>
+        <div class="pay-step pay-step--ok" id="payStep2" hidden>
+          <div class="pay-ok">
+            <span class="pay-ok__icon">
+              <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="3"><path d="m4.5 12.5 5 5 10-11"/></svg>
+            </span>
+            <h3 data-i18n="payOkTitle">پرداخت ثبت شد 🎉</h3>
+            <p data-i18n="payOkSub">کد پیگیری سفارش تو:</p>
+            <div class="pay-code">
+              <b id="payCode" dir="ltr">---</b>
+              <button class="pay-code__copy" id="copyCode" type="button" data-i18n="payCopy">کپی کد</button>
+            </div>
+            <p class="pay-ok__note" data-i18n="payOkNote">سفارش با همین کد به تلگرام مدیریت ارسال شد. اگر سوالی داشتی، این کد را به ادمین بگو.</p>
+            <button class="btn btn--ghost btn--block" id="payDone" data-i18n="payDone">باشه، بستن</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== RAFFLE MODAL ===== -->
   <div class="overlay" id="raffleOverlay"></div>
   <div class="modal" id="raffleModal" role="dialog" aria-label="Raffle">
@@ -358,8 +419,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/supabase-config.js?v=84"></script>
-  <script src="js/db.js?v=84"></script>
-  <script src="js/main.js?v=84"></script>
+  <script src="js/supabase-config.js?v=86"></script>
+  <script src="js/db.js?v=86"></script>
+  <script src="js/main.js?v=86"></script>
 </body>
 </html>

@@ -81,6 +81,34 @@ const I18N = {
     tCheckout: "سفارش ثبت شد! پیام آن در تلگرام مدیریت (<b>@ZEUS_ADMIN0</b>) ارسال شد.",
     ckWaitSec: "برای جلوگیری از اسپم، {s} ثانیه صبر کن.",
     ckTooFast: "سفارشات شما زیاد است؛ لطفاً کمی صبر کن.",
+    payTitle: "پرداخت سفارش",
+    paySub: "مبلغ سفارش را به کارت زیر واریز کن، بعد عکس «فیش» را آپلود کن.",
+    payItemsLbl: "سفارش تو:",
+    payCardLbl: "واریز به کارت:",
+    payCardNameLbl: "به نام:",
+    payNote: "بعد از واریز، عکس فیش را اینجا آپلود کن تا کد پیگیری بگیری.",
+    payDropTxt: "آپلود فیش واریز",
+    payDropSub: "عکس فیش — روی کادر بزن یا بکش و رها کن",
+    payDropBad: "فقط عکس انتخاب کن.",
+    payDropBig: "حجم عکس خیلی زیاد است (حداکثر ۸ مگابایت).",
+    paySubmit: "ثبت فیش و دریافت کد پیگیری",
+    payTrackLbl: "کد پیگیری:",
+    payOkTitle: "پرداخت ثبت شد 🎉",
+    payOkSub: "کد پیگیری سفارش تو:",
+    payCopy: "کپی کد",
+    payCopied: "کپی شد ✓",
+    payOkNote: "سفارش با همین کد به تلگرام مدیریت ارسال شد. اگر سوالی داشتی، این کد را به ادمین بگو.",
+    payDone: "باشه، بستن",
+    admPayTitle: "اطلاعات کارت پرداخت",
+    admPayNote: "شماره کارت و نام صاحب کارتی که هنگام خرید برای کاربر نمایش داده می‌شود.",
+    admPayCard: "شماره کارت",
+    admPayCardPh: "6037-XXXX-XXXX-XXXX",
+    admPayHolder: "نام صاحب کارت",
+    admPayHolderPh: "مثلاً: علی رضایی",
+    admPaySave: "ذخیره کارت",
+    admPaySaved: "اطلاعات کارت ذخیره شد ✓",
+    admPayCardOnly: "فقط عدد و خط تیره وارد کنید.",
+    admPayEmpty: "شماره کارت را وارد کنید.",
     tProfileFirst: "ابتدا در پروفایل آیدی تلگرام ثبت کنید.",
     navInv: "اینونتوری", invTitle: "اینونتوری من", invEmptyTitle: "هنوز آیتمی در اینونتوری شما نیست.",
     invLoading: "در حال بارگذاری اینونتوری...",
@@ -147,6 +175,34 @@ const I18N = {
     tCheckout: "Order placed! Sent to admin Telegram (<b>@ZEUS_ADMIN0</b>).",
     ckWaitSec: "Wait {s}s to prevent spam.",
     ckTooFast: "Too many orders — please wait a moment.",
+    payTitle: "Checkout",
+    paySub: "Send the amount to the card below, then upload the receipt photo.",
+    payItemsLbl: "Your order:",
+    payCardLbl: "Pay to card:",
+    payCardNameLbl: "Holder:",
+    payNote: "After paying, upload the receipt photo here to get your tracking code.",
+    payDropTxt: "Upload payment receipt",
+    payDropSub: "Receipt photo — tap or drag & drop",
+    payDropBad: "Please choose an image.",
+    payDropBig: "Image is too large (max 8 MB).",
+    paySubmit: "Upload receipt & get tracking code",
+    payTrackLbl: "Tracking code:",
+    payOkTitle: "Payment received 🎉",
+    payOkSub: "Your tracking code:",
+    payCopy: "Copy code",
+    payCopied: "Copied ✓",
+    payOkNote: "Your order (with this code) was sent to admin Telegram. Show this code to the admin if you have any questions.",
+    payDone: "OK, done",
+    admPayTitle: "Payment card",
+    admPayNote: "Card number & holder name shown to buyers at checkout.",
+    admPayCard: "Card number",
+    admPayCardPh: "6037-XXXX-XXXX-XXXX",
+    admPayHolder: "Card holder",
+    admPayHolderPh: "e.g. Ali Rezayi",
+    admPaySave: "Save card",
+    admPaySaved: "Card info saved ✓",
+    admPayCardOnly: "Digits and dashes only.",
+    admPayEmpty: "Enter the card number.",
     tProfileFirst: "Save your Telegram ID in your profile first.",
 navInv: "Inventory", invTitle: "My Inventory", invEmptyTitle: "No items in your inventory yet.",
     invLoading: "Loading inventory...",
@@ -1077,6 +1133,172 @@ if (profileModal) {
   if (couponInput) couponInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyCoupon(); } });
   if (couponRemoveBtn) couponRemoveBtn.addEventListener("click", () => { appliedCoupon = null; if (couponInput) couponInput.value = ""; renderCart(); });
 
+  /* ---------- پرداخت / checkout flow (card → receive → tracking code → telegram) ---------- */
+  const payOverlay = $id("payOverlay");
+  const payModalEl = $id("payModal");
+  const payStep1 = $id("payStep1");
+  const payStep2 = $id("payStep2");
+  const payItemsEl = $id("payItems");
+  const payCardNum = $id("payCardNum");
+  const payCardName = $id("payCardName");
+  const payFile = $id("payFile");
+  const payDrop = $id("payDrop");
+  const payPrevWrap = $id("payPrevWrap");
+  const payPrev = $id("payPrev");
+  const payClear = $id("payClear");
+  const paySubmit = $id("paySubmit");
+  const payCode = $id("payCode");
+  const copyCodeBtn = $id("copyCode");
+  const payDone = $id("payDone");
+  let payFlow = null;
+  let payDataUrl = "";
+
+  function fmtCard(v) {
+    return String(v || "").replace(/[^0-9]/g, "").replace(/(.{4})(?=.)/g, "$1-");
+  }
+  function makeTrackCode() {
+    const A = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    let s = "";
+    for (let i = 0; i < 5; i++) s += A[Math.floor(Math.random() * A.length)];
+    return "ZSH-" + s + "-" + Date.now().toString(36).toUpperCase().slice(-3);
+  }
+  function openPayModal() {
+    if (!payModalEl || !payFlow) return;
+    const card = fmtCard(getSetting("pay_card"));
+    const holder = String(getSetting("pay_card_name") || "").trim();
+    payCardNum.textContent = card || "6037-0000-0000-0000";
+    payCardName.textContent = holder || "—";
+    payItemsEl.innerHTML = (payFlow.items || []).map(n => {
+      const s = findSkin(n);
+      const price = s ? skinFinalPrice(s) : 0;
+      return `<div class="pay-item"><span>${escT(s ? s.name : n)}</span><b>${twoFix(price)} ${unitTxt()}</b></div>`;
+    }).join("");
+    if (payFlow.discountAmt > 0 && payFlow.couponCode) {
+      payItemsEl.insertAdjacentHTML("beforeend",
+        `<div class="pay-item pay-item--disc"><span>${t("couponOff")} (${escT(payFlow.couponCode)})</span><b>-${twoFix(payFlow.discountAmt)} ${unitTxt()}</b></div>`);
+    }
+    payItemsEl.insertAdjacentHTML("beforeend",
+      `<div class="pay-item pay-item--total"><span>${t("cartTotal")}</span><b>${twoFix(payFlow.total)} ${unitTxt()}</b></div>`);
+    payDataUrl = "";
+    if (payFile) payFile.value = "";
+    if (payPrev) payPrev.removeAttribute("src");
+    if (payPrevWrap) payPrevWrap.hidden = true;
+    if (paySubmit) paySubmit.disabled = true;
+    if (payStep1) payStep1.hidden = false;
+    if (payStep2) payStep2.hidden = true;
+    if (payCode) payCode.textContent = "---";
+    payModalEl.classList.add("is-open");
+    if (payOverlay) payOverlay.classList.add("is-open");
+    closeCart();
+  }
+  function closePayModal() {
+    payFlow = null; payDataUrl = "";
+    if (payModalEl) payModalEl.classList.remove("is-open");
+    if (payOverlay) payOverlay.classList.remove("is-open");
+  }
+  function setReceiptFile(f) {
+    if (!f || !/^image\//.test(f.type)) { showToast(t("payDropBad"), true); return; }
+    if (f.size > 8 * 1024 * 1024) { showToast(t("payDropBig"), true); return; }
+    const fr = new FileReader();
+    if (fr.error) return;
+    fr.onload = () => {
+      payDataUrl = String(fr.result || "");
+      if (payPrev) payPrev.setAttribute("src", payDataUrl);
+      if (payPrevWrap) payPrevWrap.hidden = false;
+      if (paySubmit) paySubmit.disabled = false;
+    };
+    fr.readAsDataURL(f);
+  }
+  if (payDrop) {
+    payDrop.addEventListener("click", () => { if (payFile) payFile.click(); });
+    ["dragover", "dragleave", "drop"].forEach(ev => {
+      payDrop.addEventListener(ev, e => {
+        e.preventDefault();
+        if (ev === "dragleave") { payDrop.classList.remove("is-drag"); return; }
+        if (ev === "dragover") { payDrop.classList.add("is-drag"); return; }
+        payDrop.classList.remove("is-drag");
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) setReceiptFile(f);
+      });
+    });
+  }
+  if (payFile) payFile.addEventListener("change", () => {
+    const f = payFile.files && payFile.files[0];
+    if (f) setReceiptFile(f);
+  });
+  if (payClear) payClear.addEventListener("click", () => {
+    payDataUrl = "";
+    if (payFile) payFile.value = "";
+    if (payPrev) payPrev.removeAttribute("src");
+    if (payPrevWrap) payPrevWrap.hidden = true;
+    if (paySubmit) paySubmit.disabled = true;
+  });
+  const closePayEls = [payOverlay, $id("closePay"), payDone];
+  closePayEls.forEach(el => { if (el) el.addEventListener("click", closePayModal); });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && payModalEl && payModalEl.classList.contains("is-open")) closePayModal();
+  });
+  if (copyCodeBtn) copyCodeBtn.addEventListener("click", () => {
+    const code = String(payCode && payCode.textContent ? payCode.textContent : "").trim();
+    if (!code) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code);
+      else {
+        const ta = document.createElement("textarea");
+        ta.value = code;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+      }
+    } catch { /* ignore */ }
+    showToast(t("payCopied"));
+  });
+  if (paySubmit) paySubmit.addEventListener("click", () => {
+    const flow = payFlow;
+    if (!flow || !flow.newOrder) return;
+    if (!payDataUrl) { showToast(t("payDropBad"), true); return; }
+    const tg = flow.tg;
+    const CD_MS = 30000;
+    paySubmit.disabled = true;
+    const code = makeTrackCode();
+    flow.newOrder.items.push({ special: "receipt", code: code, img: payDataUrl });
+    if (typeof placeOrder === "function") {
+      placeOrder(flow.newOrder);
+    } else {
+      const orders = getOrders();
+      orders.push(flow.newOrder);
+      saveOrders(orders);
+    }
+    addUser(tg);
+    if (flow.couponCode) {
+      claimLocal(String(flow.couponCode).toUpperCase());
+      if (typeof dbClaimCoupon === "function") {
+        Promise.resolve(dbClaimCoupon(String(flow.couponCode).toUpperCase(), tg))
+          .then(r => { if (r && r.ok === false) showToast(t("couponErrUsed"), true); });
+      }
+    }
+    appliedCoupon = null;
+    cart = [];
+    saveCart();
+    renderCart();
+    closeCart();
+    hideToast();
+    localStorage.setItem(flow.tgKey, String(Date.now()));
+    const cb = $id("checkoutBtn");
+    if (cb) { cb.disabled = true; setTimeout(() => { cb.disabled = false; }, CD_MS); }
+    const body = [...flow.msgBody];
+    body.push(`\n${t("payTrackLbl")} ${code}`);
+    const msg = encodeURIComponent(
+      `🛒⚡️ New order ZEUSSHOP⚡️\n\n${body.join("\n")}\nCustomer telegram: ${tg}`
+    );
+    window.open("https://t.me/ZEUS_ADMIN0?text=" + msg, "_blank", "noopener");
+    showToast(t("tCheckout", { tg }));
+    if (payCode) payCode.textContent = code;
+    if (payStep1) payStep1.hidden = true;
+    if (payStep2) payStep2.hidden = false;
+  });
+
   $id("checkoutBtn").addEventListener("click", () => {
     requireTelegram(async () => {
       const tg = getTelegram();
@@ -1102,9 +1324,6 @@ if (profileModal) {
         msgBody.push(`\n🏷️ ${t("couponOff")} (${appliedCoupon.code}): -${twoFix(discountAmt)} ${unitTxt()}`);
       }
       msgBody.push(`\nTotal: ${twoFix(total)} ${unitTxt()}`);
-      const msg = encodeURIComponent(
-        `🛒⚡️ New order ZEUSSHOP⚡️\n\n${msgBody.join("\n")}\nCustomer telegram: ${tg}`
-      );
       const newOrder = {
         id: Date.now(),
         items: cart.map(n => {
@@ -1119,36 +1338,17 @@ if (profileModal) {
         status: "pending",
         coupon: appliedCoupon ? appliedCoupon.code : "",
       };
-      /* insert-only save: public users can INSERT but not UPDATE orders (RLS) */
-      if (typeof placeOrder === "function") {
-        placeOrder(newOrder);
-      } else {
-        const orders = getOrders();
-        orders.push(newOrder);
-        saveOrders(orders);
-      }
-      addUser(tg);
-      if (appliedCoupon) {
-        claimLocal(String(appliedCoupon.code).toUpperCase());
-        /* reserve the code on the server so other shoppers can't use it
-           while this order is still pending (graceful if claims table missing) */
-        if (typeof dbClaimCoupon === "function") {
-          Promise.resolve(dbClaimCoupon(String(appliedCoupon.code).toUpperCase(), tg))
-            .then(r => { if (r && r.ok === false) showToast(t("couponErrUsed"), true); });
-        }
-      }
-      appliedCoupon = null;
-      cart = [];
-      saveCart();
-      renderCart();
-      closeCart();
-      hideToast();
-      window.open("https://t.me/ZEUS_ADMIN0?text=" + msg, "_blank", "noopener");
-      showToast(t("tCheckout", { tg }));
-      localStorage.setItem(tgKey, String(Date.now()));
-      const cb = $id("checkoutBtn");
-      cb.disabled = true;
-      setTimeout(() => { cb.disabled = false; }, CD_MS);
+      payFlow = {
+        newOrder: newOrder,
+        tg: tg,
+        tgKey: tgKey,
+        msgBody: msgBody,
+        items: [...cart],
+        total: total,
+        discountAmt: discountAmt,
+        couponCode: appliedCoupon ? appliedCoupon.code : "",
+      };
+      openPayModal();
     });
   });
 
@@ -1533,7 +1733,7 @@ if (profileModal) {
     const chipKeys = new Set();
     recent.forEach(o => {
       (Array.isArray(o.items) ? o.items : []).forEach(it => {
-        if (!it || typeof it !== "object") return;
+        if (!it || typeof it !== "object" || it.special) return;
         const key = o.id + "|" + String(it.name || "") + "|" + (Number(it.price) || 0);
         if (chipKeys.has(key)) return;
         chipKeys.add(key);
