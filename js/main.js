@@ -1701,8 +1701,9 @@ if (profileModal) {
         <span class="bought__sep" aria-hidden="true"></span>
         <span class="bought__skin">
           <span class="bought__gun" style="--c:${rc}">
-            ${img ? `<img src="${encImg(img)}" alt="" loading="lazy" onerror="this.remove()" />` : ""}
-            <em>${weaponL ? escT(weaponL.charAt(0)) : "؟"}</em>
+            ${img
+              ? `<img src="${encImg(img)}" alt="" loading="lazy" onerror="this.remove()" />`
+              : `<em>${weaponL ? escT(weaponL.charAt(0)) : "؟"}</em>`}
           </span>
           <span class="bought__meta">
             <b title="${escT(name)}">${name ? escT(name) : "؟"}</b>
