@@ -7,7 +7,7 @@
   <link rel="icon" type="image/png" href="image/fav.png" />
   <link rel="stylesheet" href="css/fonts.css?v=86" />
   <link rel="stylesheet" href="css/style.css?v=86" />
-  <link rel="stylesheet" href="css/admin.css?v=88" />
+  <link rel="stylesheet" href="css/admin.css?v=89" />
 </head>
 <body class="admin">
   <aside class="admin__side" id="sideBar">
@@ -160,6 +160,11 @@
       </div>
       <div class="panel-card__body">
         <p class="settings-note" data-i18n="admOrdersNote">سفارش‌های تایید شده این بخش را ترک می‌کنند و به بخش «تایید شده / آخرین خرید» می‌روند.</p>
+        <div class="ord-search">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input type="text" id="ordSearch" data-i18n-ph="admOrdSearchPh" placeholder="کد پیگیری، آیدی تلگرام، نام اسکین..." />
+          <button class="btn btn--ghost btn--sm ord-search__clear" id="ordSearchClear" hidden title="پاک کردن" aria-label="Clear">✕</button>
+        </div>
         <div id="ordersList"></div>
         <div class="empty" id="admOrdersEmpty" hidden>
           <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 6h15l-1.5 9H6L4 3H2"/><circle cx="9" cy="20" r="1.7"/><circle cx="17" cy="20" r="1.7"/></svg>
@@ -595,8 +600,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js?v=86"></script>
-  <script src="js/db.js?v=86"></script>
+  <script src="js/db.js?v=90"></script>
   <script src="js/main.js?v=86"></script>
-  <script src="js/admin.js?v=88"></script>
+  <script src="js/admin.js?v=89"></script>
 </body>
 </html>

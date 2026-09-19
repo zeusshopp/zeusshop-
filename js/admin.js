@@ -257,6 +257,18 @@ if (adminMain) {
   }
 
   /* ---------- orders — approve / reject → user inventory ---------- */
+  let ordQ = "";
+  function orderSearchMatch(o, q) {
+    if (String(o.id || "") === q) return true;
+    if (String(o.telegram || "").toLowerCase().includes(q)) return true;
+    if (String(o.coupon || "").toLowerCase().includes(q)) return true;
+    return (Array.isArray(o.items) ? o.items : []).some(it => {
+      if (!it || typeof it !== "object") return false;
+      if (String(it.name || "").toLowerCase().includes(q)) return true;
+      if (it.special === "receipt" && String(it.code || "").toLowerCase().includes(q)) return true;
+      return false;
+    });
+  }
   const ORD_LBL = {
     pending:  { cls: "badge--pending",  fa: "در انتظار", en: "Pending" },
     approved: { cls: "badge--ok",       fa: "تایید شده", en: "Approved" },
@@ -310,13 +322,29 @@ if (adminMain) {
   function renderOrders() {
     const wrap = $id("ordersList");
     const empty = $id("admOrdersEmpty");
+    const q = ordQ.trim().toLowerCase();
     const list = getOrders()
       .filter(o => (o.status || "pending") !== "approved")
+      .filter(o => !q || orderSearchMatch(o, q))
       .slice()
       .sort((a, b) => b.id - a.id);
     wrap.innerHTML = list.map(orderRow).join("");
     empty.hidden = list.length !== 0;
   }
+  const ordSearch = $id("ordSearch");
+  const ordSearchClear = $id("ordSearchClear");
+  if (ordSearch) ordSearch.addEventListener("input", () => {
+    ordQ = ordSearch.value;
+    if (ordSearchClear) ordSearchClear.hidden = !ordQ;
+    renderOrders();
+  });
+  if (ordSearchClear) ordSearchClear.addEventListener("click", () => {
+    ordQ = "";
+    ordSearch.value = "";
+    ordSearchClear.hidden = true;
+    renderOrders();
+    if (ordSearch) ordSearch.focus();
+  });
   function renderApproved() {
     const wrap = $id("approvedList");
     const empty = $id("admApprovedEmpty");

@@ -566,6 +566,11 @@ function dbSyncOrders(list) {
    Awaited, VERIFIED writes — the admin panel uses these for
    approve / reject / delete so an RLS block can't silently
    succeed (returns an error string when no rows were affected).
+   Status changes use a plain UPDATE (only the "orders admin
+   change" policy + is_admin), NOT an upsert — an upsert also
+   needs the public anti-spam INSERT check (checkout_allowed)
+   and can fail with no-rows-affected even when every policy
+   exists. If the row is missing, falls back to an insert.
    ---------------------------------------------------------- */
 async function dbSaveOrderDirect(o) {
   if (!DB_MODE || !supa || !DB_READY) return null;
@@ -576,15 +581,23 @@ async function dbSaveOrderDirect(o) {
     date: o.date ? new Date(o.date).toISOString() : new Date().toISOString(),
   };
   const coupon = String(o.coupon || "").trim().toUpperCase();
-  const attempt = row => supa.from("orders")
-    .upsert([row], { onConflict: "id" })
-    .then(r => r.error ? (r.error.message || "err") : (r.data && r.data.length > 0 ? null : "no-rows-affected"))
-    .catch(e => (e && e.message) || "err");
+  const row = coupon ? { ...base, coupon } : base;
   try {
-    /* if the (recreated) orders table has no coupon column yet, retry without it */
-    let err = await attempt(coupon ? { ...base, coupon } : base);
-    if (err && coupon && /coupon/i.test(err)) err = await attempt(base);
-    return err;
+    /* 1) plain UPDATE (existing row, admin-only) */
+    const u = await supa.from("orders").update(row).eq("id", Number(o.id) || 0);
+    if (u.error) return (u.error && u.error.message) || "err";
+    if (u.data && u.data.length > 0) return null;
+    /* 2) row missing → try an insert (guarded policy applies) */
+    const ins = await supa.from("orders").insert([row])
+      .then(r => r.error ? (r.error.message || "err") : (r.data && r.data.length > 0 ? null : "no-rows-affected"))
+      .catch(e => (e && e.message) || "err");
+    if (ins && coupon && /coupon/i.test(ins)) {
+      const again = await supa.from("orders").insert([base])
+        .then(r => r.error ? (r.error.message || "err") : (r.data && r.data.length > 0 ? null : "no-rows-affected"))
+        .catch(e => (e && e.message) || "err");
+      return again;
+    }
+    return ins;
   } catch (e) { return (e && e.message) || "err"; }
 }
 /* anti-spam server-side gate (RPC installed by supabase-setup.sql part 7).

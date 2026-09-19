@@ -879,6 +879,12 @@ body.admin {
 .order-row__code { display: inline-block; padding: 1px 8px; border-radius: 100px; font-size: .64rem; font-weight: 700; letter-spacing: .04em; color: var(--accent); border: 1px dashed currentColor; opacity: .85; margin-inline-start: 6px; }
 .order-row__actions { display: flex; gap: 8px; }
 
+.ord-search { display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, .04); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; margin-bottom: 14px; color: var(--muted); }
+.ord-search > svg { flex-shrink: 0; }
+.ord-search input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: var(--text); font-size: .86rem; }
+.ord-search input::placeholder { color: var(--muted); opacity: .8; }
+.ord-search__clear { flex-shrink: 0; padding: 2px 8px; line-height: 1.4; }
+
 .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: .72rem; border: 1px solid; font-weight: 700; }
 .badge--pending { color: var(--warning); border-color: rgba(255, 201, 77, .4); background: rgba(255, 201, 77, .08); }
 .badge--ok { color: var(--success); border-color: rgba(87, 203, 98, .4); background: rgba(87, 203, 98, .08); }
@@ -1182,6 +1188,7 @@ select.field-input option, select.field__input option {
   .modal { padding: 10px; }
   .modal__head { padding: 13px 14px; }
   .modal__body { padding: 14px; }
+  .ord-search { padding: 9px 12px; }
   .receipt-fig img { max-height: 55vh; }
   .order-item--receipt { max-width: 100%; white-space: normal; }
   .order-item--receipt img { width: 32px; height: 32px; }
