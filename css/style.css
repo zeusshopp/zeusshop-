@@ -1838,6 +1838,7 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
   box-shadow: 0 0 12px color-mix(in srgb, var(--c, var(--accent)) 25%, transparent);
 }
 .bought__gun img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; }
+.bought__gun img + em { display: none !important; }
 .bought__gun em {
   position: absolute; inset: 0; z-index: 0;
   display: flex; align-items: center; justify-content: center;
