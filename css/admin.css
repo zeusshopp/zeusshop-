@@ -834,11 +834,17 @@ body.admin {
   border: 1px solid rgba(240, 194, 75, .12);
 }
 .order-item--receipt { align-items: center; background: rgba(61, 220, 132, .07); border-color: rgba(61, 220, 132, .3); }
+.order-item--receipt.is-openable { cursor: zoom-in; transition: border-color .15s, transform .15s, box-shadow .15s; }
+.order-item--receipt.is-openable:hover { border-color: rgba(61, 220, 132, .6); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(61, 220, 132, .18); }
 .order-item--receipt::before { display: none; }
 .order-item--receipt img {
   width: 26px; height: 26px; object-fit: cover; border-radius: 6px;
   border: 1px solid rgba(255,255,255,.15); margin-inline-start: 4px;
 }
+.receipt-code { font-family: var(--font-en); font-size: .68rem; color: var(--accent); border: 1px dashed currentColor; border-radius: 100px; padding: 1px 8px; font-weight: 700; letter-spacing: .04em; }
+.receipt-fig { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.receipt-fig img { max-width: 100%; width: auto; height: auto; max-height: 64vh; border-radius: 12px; border: 1px solid var(--border); background: #000; box-shadow: 0 10px 40px rgba(0, 0, 0, .45); }
+.receipt-fig figcaption { font-size: .75rem; color: var(--muted); font-family: var(--font-en); direction: ltr; letter-spacing: .02em; }
 .order-item::before {
   content: ""; width: 7px; height: 7px; border-radius: 50%;
   background: var(--oc, var(--accent));
@@ -1176,6 +1182,9 @@ select.field-input option, select.field__input option {
   .modal { padding: 10px; }
   .modal__head { padding: 13px 14px; }
   .modal__body { padding: 14px; }
+  .receipt-fig img { max-height: 55vh; }
+  .order-item--receipt { max-width: 100%; white-space: normal; }
+  .order-item--receipt img { width: 32px; height: 32px; }
   .panel-card__head { flex-direction: column; align-items: stretch; gap: 8px; }
   .panel-card__head h2 { font-size: .95rem; }
   .adm-search { width: 100%; min-width: 0; }

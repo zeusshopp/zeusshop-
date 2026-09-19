@@ -7,7 +7,7 @@
   <link rel="icon" type="image/png" href="image/fav.png" />
   <link rel="stylesheet" href="css/fonts.css?v=86" />
   <link rel="stylesheet" href="css/style.css?v=86" />
-  <link rel="stylesheet" href="css/admin.css?v=86" />
+  <link rel="stylesheet" href="css/admin.css?v=88" />
 </head>
 <body class="admin">
   <aside class="admin__side" id="sideBar">
@@ -33,6 +33,10 @@
       <a href="#orders">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6h15l-1.5 9H6L4 3H2"/><circle cx="9" cy="20" r="1.7"/><circle cx="17" cy="20" r="1.7"/></svg>
         <span data-i18n="admOrders">سفارش‌ها</span>
+      </a>
+      <a href="#approved">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+        <span data-i18n="admApproved">تایید شده</span>
       </a>
       <a href="#users">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.4"/><path d="M3.5 20c0-3.2 2.5-5 5.5-5s5.5 1.8 5.5 5"/><path d="M16 5a3.4 3.4 0 0 1 0 6.3M18.5 15.6c1.3.8 2 2 2 3.4"/></svg>
@@ -152,19 +156,29 @@
     <!-- ===== ORDERS ===== -->
     <section class="panel-card is-hidden" id="orders">
       <div class="panel-card__head">
-        <h2 data-i18n="admOrdersTitle">سفارش‌های اخیر</h2>
-        <div class="ord-filters" id="ordFilters">
-          <button class="chip is-active" data-filter="all">همه</button>
-          <button class="chip" data-filter="pending">در انتظار</button>
-          <button class="chip" data-filter="approved">تایید شده</button>
-          <button class="chip" data-filter="rejected">رد شده</button>
-        </div>
+        <h2 data-i18n="admOrdersTitle">سفارش‌های در انتظار و رد شده</h2>
       </div>
       <div class="panel-card__body">
+        <p class="settings-note" data-i18n="admOrdersNote">سفارش‌های تایید شده این بخش را ترک می‌کنند و به بخش «تایید شده / آخرین خرید» می‌روند.</p>
         <div id="ordersList"></div>
         <div class="empty" id="admOrdersEmpty" hidden>
           <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 6h15l-1.5 9H6L4 3H2"/><circle cx="9" cy="20" r="1.7"/><circle cx="17" cy="20" r="1.7"/></svg>
           <p data-i18n="admOrdersEmpty">هیچ سفارشی در انتظار نیست.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== APPROVED / LAST PURCHASES ===== -->
+    <section class="panel-card is-hidden" id="approved">
+      <div class="panel-card__head">
+        <h2 data-i18n="admApprovedTitle">تایید شده / آخرین خرید</h2>
+      </div>
+      <div class="panel-card__body">
+        <p class="settings-note" data-i18n="admApprovedNote">فقط سفارش‌های تایید شده؛ همین سفارش‌ها در بخش «آخرین خرید» فروشگاه نمایش داده می‌شوند.</p>
+        <div id="approvedList"></div>
+        <div class="empty" id="admApprovedEmpty" hidden>
+          <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/><path d="M8 12l2 2 6-6"/></svg>
+          <p data-i18n="admApprovedEmpty">هنوز سفارشی تایید نشده است.</p>
         </div>
       </div>
     </section>
@@ -560,10 +574,29 @@
     </form>
   </div>
 
+  <!-- ===== RECEIPT LIGHTBOX (فیش پرداخت) ===== -->
+  <div class="overlay" id="receiptOverlay"></div>
+  <div class="modal" id="receiptModal" role="dialog" aria-modal="true" aria-label="فیش پرداخت">
+    <div class="modal__box">
+      <div class="modal__head">
+        <h3>📎 <span data-i18n="admReceiptTitle">فیش پرداخت</span> <b class="receipt-code" id="receiptCode" dir="ltr"></b></h3>
+        <button type="button" class="icon-btn" id="closeReceipt" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <figure class="receipt-fig">
+          <img id="receiptImg" alt="فیش پرداخت" />
+          <figcaption id="receiptMeta"></figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js?v=86"></script>
   <script src="js/db.js?v=86"></script>
   <script src="js/main.js?v=86"></script>
-  <script src="js/admin.js?v=86"></script>
+  <script src="js/admin.js?v=88"></script>
 </body>
 </html>

@@ -257,77 +257,77 @@ if (adminMain) {
   }
 
   /* ---------- orders — approve / reject → user inventory ---------- */
-  let ordFilter = "all";
   const ORD_LBL = {
     pending:  { cls: "badge--pending",  fa: "در انتظار", en: "Pending" },
     approved: { cls: "badge--ok",       fa: "تایید شده", en: "Approved" },
     rejected: { cls: "badge--danger",   fa: "رد شده",    en: "Rejected" },
   };
+  function orderRow(o) {
+    const st = o.status || "pending";
+    const meta = ORD_LBL[st] || ORD_LBL.pending;
+    const items = (o.items || []).map((it, idx) => {
+      let receiptHtml = "";
+      if (!it || !it.name) {
+        if (it && it.special === "receipt" && it.code) {
+          receiptHtml = `<span class="order-item order-item--receipt is-openable" role="button" tabindex="0" data-receipt="${esc(it.code)}" data-receipt-img="${esc(it.img || "")}" data-receipt-owner="${esc(o.telegram || "")}" title="${FA("مشاهده فیش پرداخت", "View payment receipt")}">📎 ${esc(it.code)}${it.img ? `<img src="${esc(it.img)}" alt="" />` : ""}</span>`;
+        }
+        return receiptHtml;
+      }
+      const r = RARITY[it.rarity] ? RARITY[it.rarity].color : "#f0c24b";
+      return `<span class="order-item" style="--oc:${r}">${esc(it.name)}<em>${twoFix(it.price)} ${unitTxt()}</em><button class="order-item__x" data-del-item="${o.id}|${idx}" title="${FA("حذف این آیتم", "Remove item")}">×</button></span>`;
+    }).join("");
+    const date = fmtDate(o.date);
+    const sumItems = (o.items || []).reduce((s, it) => s + (Number(it && it.price) || 0), 0);
+    const discTag = Number(o.total) < sumItems - 0.01
+      ? ` <span class="order-row__disc">${FA("تخفیف", "Disc")}: -${fmtPrice(sumItems - Number(o.total))}</span>`
+      : "";
+    const codeTag = o.coupon
+      ? ` <span class="order-row__code" dir="ltr">${esc(o.coupon)}</span>`
+      : "";
+    const actions = st === "pending"
+      ? `<button class="btn btn--sm btn--ok" data-approve="${o.id}">${FA("تایید ✓", "Approve ✓")}</button>
+         <button class="btn btn--sm btn--danger" data-reject="${o.id}">${FA("رد", "Reject")}</button>
+         <button class="btn btn--sm btn--ghost" data-delord="${o.id}" title="${FA("حذف سفارش", "Delete order")}">${FA("حذف", "Delete")}</button>`
+      : `<button class="btn btn--sm btn--ghost" data-delord="${o.id}" title="${FA("حذف سفارش از لیست", "Delete order")}">${FA("حذف", "Delete")}</button>`;
+    const ordColor = st === "approved" ? "var(--success)" : st === "rejected" ? "var(--danger)" : "var(--warning)";
+    return `
+    <div class="order-row" style="--ord-c:${ordColor}">
+      <div class="order-row__head">
+        <span class="order-row__id">#${esc(o.id)}</span>
+        <span class="badge ${meta.cls}">${FA(meta.fa, meta.en)}</span>
+      </div>
+      <div class="order-row__items">${items || `<span class="order-row__meta">${FA("بدون آیتم", "No items")}</span>`}</div>
+      <div class="order-row__meta">
+        <span class="order-row__date">${date || "—"}</span>
+        <span class="order-row__tg">${esc(o.telegram || "")}</span>
+      </div>
+      <div class="order-row__foot">
+        <span class="order-row__total"><small>${FA("مجموع", "Total")}</small> ${fmtPrice(o.total)}${discTag}${codeTag}</span>
+        <div class="order-row__actions">${actions}</div>
+      </div>
+    </div>`;
+  }
   function renderOrders() {
     const wrap = $id("ordersList");
     const empty = $id("admOrdersEmpty");
-    const list = getOrders().slice().sort((a, b) => b.id - a.id).filter(o => {
-      return ordFilter === "all" ? true : (o.status || "pending") === ordFilter;
-    });
+    const list = getOrders()
+      .filter(o => (o.status || "pending") !== "approved")
+      .slice()
+      .sort((a, b) => b.id - a.id);
+    wrap.innerHTML = list.map(orderRow).join("");
     empty.hidden = list.length !== 0;
-    const matchFilters = document.querySelectorAll("#ordFilters .chip");
-    if (matchFilters.length) {
-      matchFilters.forEach(c => c.classList.toggle("is-active", c.dataset.filter === ordFilter));
-    }
-    wrap.innerHTML = list.map(o => {
-      const st = o.status || "pending";
-      const meta = ORD_LBL[st] || ORD_LBL.pending;
-      const items = (o.items || []).map((it, idx) => {
-        let receiptHtml = "";
-        if (!it || !it.name) {
-          if (it && it.special === "receipt" && it.code) {
-            receiptHtml = `<span class="order-item order-item--receipt" title="${FA("فیش پرداخت", "Payment receipt")}">📎 ${esc(it.code)}${it.img ? `<img src="${esc(it.img)}" alt="" />` : ""}</span>`;
-          }
-          return receiptHtml;
-        }
-        const r = RARITY[it.rarity] ? RARITY[it.rarity].color : "#f0c24b";
-        return `<span class="order-item" style="--oc:${r}">${esc(it.name)}<em>${twoFix(it.price)} ${unitTxt()}</em><button class="order-item__x" data-del-item="${o.id}|${idx}" title="${FA("حذف این آیتم", "Remove item")}">×</button></span>`;
-      }).join("");
-      const date = fmtDate(o.date);
-      const sumItems = (o.items || []).reduce((s, it) => s + (Number(it && it.price) || 0), 0);
-      const discTag = Number(o.total) < sumItems - 0.01
-        ? ` <span class="order-row__disc">${FA("تخفیف", "Disc")}: -${fmtPrice(sumItems - Number(o.total))}</span>`
-        : "";
-      const codeTag = o.coupon
-        ? ` <span class="order-row__code" dir="ltr">${esc(o.coupon)}</span>`
-        : "";
-      const actions = st === "pending"
-        ? `<button class="btn btn--sm btn--ok" data-approve="${o.id}">${FA("تایید ✓", "Approve ✓")}</button>
-           <button class="btn btn--sm btn--danger" data-reject="${o.id}">${FA("رد", "Reject")}</button>
-           <button class="btn btn--sm btn--ghost" data-delord="${o.id}" title="${FA("حذف سفارش", "Delete order")}">${FA("حذف", "Delete")}</button>`
-        : `<button class="btn btn--sm btn--ghost" data-delord="${o.id}" title="${FA("حذف سفارش از لیست", "Delete order")}">${FA("حذف", "Delete")}</button>`;
-      const ordColor = st === "approved" ? "var(--success)" : st === "rejected" ? "var(--danger)" : "var(--warning)";
-      return `
-      <div class="order-row" style="--ord-c:${ordColor}">
-        <div class="order-row__head">
-          <span class="order-row__id">#${esc(o.id)}</span>
-          <span class="badge ${meta.cls}">${FA(meta.fa, meta.en)}</span>
-        </div>
-        <div class="order-row__items">${items || `<span class="order-row__meta">${FA("بدون آیتم", "No items")}</span>`}</div>
-        <div class="order-row__meta">
-          <span class="order-row__date">${date || "—"}</span>
-          <span class="order-row__tg">${esc(o.telegram || "")}</span>
-        </div>
-        <div class="order-row__foot">
-          <span class="order-row__total"><small>${FA("مجموع", "Total")}</small> ${fmtPrice(o.total)}${discTag}${codeTag}</span>
-          <div class="order-row__actions">${actions}</div>
-        </div>
-      </div>`;
-    }).join("");
   }
-
-  const ordFilters = $id("ordFilters");
-  if (ordFilters) ordFilters.addEventListener("click", e => {
-    const chip = e.target.closest(".chip");
-    if (!chip) return;
-    ordFilter = chip.dataset.filter || "all";
-    renderOrders();
-  });
+  function renderApproved() {
+    const wrap = $id("approvedList");
+    const empty = $id("admApprovedEmpty");
+    if (!wrap || !empty) return;
+    const list = getOrders()
+      .filter(o => (o.status || "pending") === "approved")
+      .slice()
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    wrap.innerHTML = list.map(orderRow).join("");
+    empty.hidden = list.length !== 0;
+  }
 
   /* ---------- discount coupons ---------- */
   function renderCoupons() {
@@ -580,7 +580,12 @@ const tog = e.target.closest("[data-cp-toggle]");
     });
   }
 
-  $id("ordersList").addEventListener("click", async e => {
+  async function ordersClickHandler(e) {
+    const rc = e.target.closest("[data-receipt]");
+    if (rc) {
+      openReceipt(rc.dataset.receipt || "", rc.dataset.receiptImg || "", rc.dataset.receiptOwner || "");
+      return;
+    }
     const di = e.target.closest("[data-del-item]");
     if (di) {
       const bits = String(di.getAttribute("data-del-item") || "").split("|");
@@ -680,7 +685,40 @@ const tog = e.target.closest("[data-cp-toggle]");
     showToast(a
       ? FA(`سفارش تایید شد؛ آیتم‌ها به اینونتوری ${o.telegram} اضافه شد ✓`, `Order approved; items added to ${o.telegram}'s inventory ✓`)
       : FA("سفارش رد شد.", "Order rejected."));
-  });
+  }
+  const ordersListEl = $id("ordersList");
+  const approvedListEl = $id("approvedList");
+  if (ordersListEl) ordersListEl.addEventListener("click", ordersClickHandler);
+  if (approvedListEl) approvedListEl.addEventListener("click", ordersClickHandler);
+
+  /* ---------- receipt lightbox (فیش پرداخت) ---------- */
+  const receiptModal = $id("receiptModal");
+  const receiptOverlay = $id("receiptOverlay");
+  function closeReceiptBox() {
+    if (receiptModal) receiptModal.classList.remove("is-on");
+    if (receiptOverlay) receiptOverlay.classList.remove("is-on");
+    const ri = $id("receiptImg");
+    if (ri) ri.removeAttribute("src");
+  }
+  function openReceipt(code, img, owner) {
+    if (!receiptModal || !receiptOverlay) return;
+    const ri = $id("receiptImg"), rCode = $id("receiptCode"), rMeta = $id("receiptMeta");
+    if (ri) {
+      if (img) { ri.src = img; ri.hidden = false; }
+      else { ri.removeAttribute("src"); ri.hidden = true; }
+    }
+    if (rCode) rCode.textContent = code || "";
+    if (rMeta) rMeta.textContent = FA(
+      (owner || "") + " — کد پیگیری " + (code || ""),
+      (owner || "") + " — tracking " + (code || "")
+    );
+    receiptModal.classList.add("is-on");
+    receiptOverlay.classList.add("is-on");
+  }
+  const closeReceiptBtn = $id("closeReceipt");
+  if (closeReceiptBtn) closeReceiptBtn.addEventListener("click", closeReceiptBox);
+  if (receiptOverlay) receiptOverlay.addEventListener("click", closeReceiptBox);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeReceiptBox(); });
 
   /* ---------- users ---------- */
   function renderUsers() {
@@ -720,7 +758,7 @@ const tog = e.target.closest("[data-cp-toggle]");
     }).join("");
   }
 
-  function renderAll() { renderStats(); renderInventory(); renderOrders(); renderUsers(); renderCoupons(); }
+  function renderAll() { renderStats(); renderInventory(); renderOrders(); renderApproved(); renderUsers(); renderCoupons(); }
 
   /* ---------- add / edit skin modal ---------- */
   const skinModal = $id("skinModal");
