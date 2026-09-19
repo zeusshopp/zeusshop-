@@ -1620,18 +1620,12 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
   #searchInput { font-size: .85rem; padding: 9px 10px; }
   .ann-modal__box { padding: 26px 20px 22px; }
   .recent {
-    padding: 8px 0;
-    overflow-x: auto; overflow-y: hidden;
-    scroll-snap-type: x proximity;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    cursor: default;
+    padding: 12px 4px;
+    border-radius: 14px;
   }
   .recent::before, .recent::after { display: none; }
-  .recent::-webkit-scrollbar { display: none; }
-  .recent__track { gap: 10px; width: auto; animation: none !important; }
-  .recent__track.is-anim { animation: none !important; }
-  .bought { flex-shrink: 0; scroll-snap-align: start; padding: 7px 12px 7px 9px; gap: 9px; border-radius: 14px; }
+  .recent__track { gap: 10px; }
+  .bought { flex-shrink: 0; padding: 7px 12px 7px 9px; gap: 9px; border-radius: 14px; }
   .bought__av { width: 38px; height: 38px; flex-basis: 38px; }
   .bought__gun { width: 32px; height: 32px; flex-basis: 32px; }
   .bought__meta { max-width: 120px; }
@@ -1716,21 +1710,26 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
 
 /* ===== Last purchases feed (homepage) ===== */
 .latest {
-  padding: 8px 0 10px;
+  padding: 20px 0 26px;
   overflow: hidden;
+  animation: latestSection .7s ease-out both;
+}
+@keyframes latestSection {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
 }
 .latest__head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  margin-bottom: 2px;
+  margin-bottom: 14px;
 }
 .latest__label {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-size: .78rem; font-weight: 800; letter-spacing: .4px; color: var(--accent);
+  display: inline-flex; align-items: center; gap: 9px;
+  font-size: .84rem; font-weight: 800; letter-spacing: .3px; color: var(--accent);
   text-transform: uppercase;
 }
 .latest__dot {
   position: relative;
-  width: 8px; height: 8px; border-radius: 50%;
+  width: 9px; height: 9px; border-radius: 50%;
   background: #3ddc84;
 }
 .latest__dot::after {
@@ -1764,25 +1763,33 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
 .recent {
   position: relative;
   overflow: hidden;
-  padding: 10px 0;
+  padding: 18px 8px;
   cursor: grab;
+  border-radius: 18px;
+  border: 1px solid rgba(240,194,75,.16);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.03), transparent 45%),
+    radial-gradient(560px 130px at 50% -30%, rgba(240,194,75,.10), transparent 60%),
+    var(--card);
+  box-shadow: 0 14px 40px rgba(0,0,0,.30), inset 0 1px 0 rgba(240,194,75,.10);
 }
-.recent::before, .recent::after {
-  content: ""; position: absolute; top: 0; bottom: 0; width: 70px; z-index: 2;
-  pointer-events: none;
-}
-.recent::before { inset-inline-start: -1px; background: linear-gradient(to var(--side-end, left), rgba(7,6,4,0), var(--bg) 92%); }
-.recent::after  { inset-inline-end: -1px;  background: linear-gradient(to var(--side-start, right), rgba(7,6,4,0), var(--bg) 92%); }
+.recent::before, .recent::after { display: none; }
 .recent__track {
   display: flex; align-items: center; gap: 14px;
   width: max-content;
   will-change: transform;
 }
-.recent__track.is-anim { animation: recent-marquee 52s linear infinite; }
-.recent:hover .recent__track.is-anim { animation-play-state: paused; }
+.recent__spacer { flex: none; }
+.recent__track.is-anim { animation: recent-marquee var(--tick-dur, 52s) linear infinite; }
+.recent__track.is-anim-single { animation: recent-marquee-single var(--tick-dur, 18s) linear infinite; }
+.recent:hover .recent__track.is-anim, .recent:hover .recent__track.is-anim-single { animation-play-state: paused; }
 @keyframes recent-marquee {
   from { transform: translateX(0); }
-  to   { transform: translateX(50%); }
+  to   { transform: translateX(-50%); }
+}
+@keyframes recent-marquee-single {
+  from { transform: translateX(var(--tick-from, 100%)); }
+  to   { transform: translateX(var(--tick-to, -100%)); }
 }
 
 .bought {
@@ -1791,20 +1798,23 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
   border-radius: 999px;
   background:
     linear-gradient(180deg, rgba(26,23,14,.65), rgba(9,8,5,.5)),
-    radial-gradient(140px 70px at 20% 0%, rgba(240,194,75,.14), transparent 70%);
-  border: 1px solid rgba(240,194,75,.22);
+    radial-gradient(140px 70px at 20% 0%, color-mix(in srgb, var(--c, #f0c24b) 16%, transparent), transparent 70%);
+  border: 1.5px solid color-mix(in srgb, var(--c, #f0c24b) 32%, transparent);
   box-shadow:
-    0 8px 24px rgba(0,0,0,.38), inset 0 1px 0 rgba(240,194,75,.12), 0 0 0 0 transparent;
+    0 8px 24px rgba(0,0,0,.38),
+    0 0 20px color-mix(in srgb, var(--c, #f0c24b) 10%, transparent),
+    inset 0 1px 0 rgba(240,194,75,.12), 0 0 0 0 transparent;
   white-space: nowrap;
   transition: border-color .25s, transform .25s, box-shadow .25s;
   animation: .35s both;
   animation-name: boughtEnter;
 }
 .bought:hover {
-  border-color: rgba(240,194,75,.55);
+  border-color: color-mix(in srgb, var(--c, #f0c24b) 68%, transparent);
   transform: translateY(-2px);
   box-shadow:
-    0 14px 34px rgba(0,0,0,.48), 0 0 26px rgba(240,194,75,.12),
+    0 14px 34px rgba(0,0,0,.48),
+    0 0 28px color-mix(in srgb, var(--c, #f0c24b) 20%, transparent),
     inset 0 1px 0 rgba(240,194,75,.16);
 }
 @keyframes boughtEnter {
@@ -1823,6 +1833,13 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
   position: absolute; inset: 0; z-index: 0;
   display: flex; align-items: center; justify-content: center;
   font-style: normal; font-weight: 800; color: var(--accent); font-size: .95rem;
+}
+.bought__av::after {
+  content: ""; position: absolute; top: 2px; inset-inline-end: 2px; z-index: 2;
+  width: 11px; height: 11px; border-radius: 50%;
+  background: #3ddc84;
+  border: 2px solid var(--card);
+  box-shadow: 0 0 8px rgba(61,220,132,.65);
 }
 .bought__who-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .bought__who-item b { color: var(--text); font-size: .8rem; white-space: nowrap; }

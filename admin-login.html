@@ -6,8 +6,8 @@
   <title>ورود مدیریت | ZEUSSHOP</title>
   <link rel="icon" type="image/png" href="image/fav.png" />
   <link rel="stylesheet" href="css/fonts.css?v=86" />
-  <link rel="stylesheet" href="css/style.css?v=92" />
-  <link rel="stylesheet" href="css/admin.css?v=86" />
+  <link rel="stylesheet" href="css/style.css?v=98" />
+  <link rel="stylesheet" href="css/admin.css?v=89" />
 </head>
 <body class="login">
   <main class="login__wrap">
@@ -23,13 +23,13 @@
       <p class="login__sub" data-i18n="loginSub">برای مدیریت اسکین‌ها و سفارش‌ها وارد شوید.</p>
 
       <div class="field">
-        <label class="field-label" for="adminUser">ایمیل مدیریت</label>
-        <input class="field-input" type="email" id="adminUser" autocomplete="username" placeholder="ایمیل خود را وارد کنید" />
+        <label class="field-label" for="adminUser">نام کاربری مدیریت</label>
+        <input class="field-input" type="text" id="adminUser" dir="ltr" autocomplete="username" placeholder="admin" />
       </div>
 
       <div class="field">
         <label class="field-label" for="adminPass" data-i18n="loginPass">رمز عبور</label>
-        <input class="field-input" type="password" id="adminPass" autocomplete="current-password" placeholder="رمز خود را وارد کنید" />
+        <input class="field-input" type="password" id="adminPass" dir="ltr" autocomplete="current-password" placeholder="••••••" />
       </div>
 
       <div class="login__err" id="loginErr" role="alert"></div>
@@ -42,8 +42,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js?v=86"></script>
-  <script src="js/db.js?v=90"></script>
-  <script src="js/main.js?v=91"></script>
-  <script src="js/admin.js?v=86"></script>
+  <script src="js/db.js?v=102"></script>
+  <script src="js/main.js?v=102"></script>
+  <script src="js/admin.js?v=102"></script>
 </body>
 </html>

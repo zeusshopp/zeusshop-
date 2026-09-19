@@ -1,8 +1,23 @@
 -- =============================================================
 -- ZEUSSHOP — master database script (all-in-one, re-runnable)
 -- -------------------------------------------------------------
+-- LOGIN MODEL (single login = the Supabase account):
+--   * The admin login page signs in DIRECTLY with the Supabase
+--     email/password you type there (no second login ceremony).
+--   * First successful login auto-creates the matching Supabase
+--     account with the typed password (explicit login only) and
+--     calls admin_self_register() to add your uid to public.admins.
+--   * Background flows (panel auto-ensure, write guards) NEVER
+--     signUp — so no confirmation emails / rate-limit spam.
+--   * If you'd rather create the account by hand:
+--       Auth → Users → Add user (email + password ≥ 6 chars)
+--     then run the BOOTSTRAP snippet below (section 0b).
+--
+-- Sections:
+-- 0b) admins table + first-admin bootstrap (email-based)
 -- 1) RLS enabled everywhere
--- 2) helper functions (is_admin, count_users, checkout_allowed)
+-- 2) helper functions (is_admin, count_users, checkout_allowed,
+--    admin_self_register)
 -- 3) orders: coupon column + primary key + indexes
 -- 4) every RLS policy, dropped & re-created INSIDE one DO block
 --    (direct DDL → "policy already exists" (42710) never happens)
@@ -12,6 +27,20 @@
 --    (190,000 toman, 2 days ago, img image/M4.webp)
 -- Run: SQL Editor → New query (empty buffer) → paste → Run.
 -- =============================================================
+
+-- 0b) ADMINS TABLE + FIRST-ADMIN BOOTSTRAP ----------------------
+-- The admins table only stores uids; is_admin() checks membership.
+-- Make sure it exists (re-runnable):
+create table if not exists public.admins (id uuid primary key);
+
+-- FIRST ADMIN the manual way (skip using the login page):
+--   1) Auth → Users → Add user  (tick "Auto Confirm User" if
+--      "Confirm email" is ON, otherwise no confirmation email)
+--   2) Replace the address below and run:
+--
+--   insert into public.admins (id)
+--   select id from auth.users where email = 'you@example.com'
+--   on conflict (id) do nothing;
 
 -- 1) ROW LEVEL SECURITY ----------------------------------------
 do $$
@@ -48,6 +77,21 @@ returns boolean language sql stable security definer as $$
 $$;
 revoke execute on function public.checkout_allowed(text) from public, anon, authenticated;
 grant execute on function public.checkout_allowed(text) to anon, authenticated;
+
+-- 2b) SELF-REGISTER: after the admin logs in (either with their
+--     typed Supabase credentials or a freshly auto-created account),
+--     this adds the signed-in uid to public.admins, so RLS's
+--     is_admin() passes — no separate registering step needed.
+create or replace function public.admin_self_register()
+returns boolean language plpgsql security definer as $$
+begin
+  if auth.uid() is null then return false; end if;
+  insert into public.admins (id) values (auth.uid())
+  on conflict (id) do nothing;
+  return true;
+end $$;
+revoke execute on function public.admin_self_register() from public;
+grant execute on function public.admin_self_register() to anon, authenticated;
 
 -- 3) ORDERS: coupon column + real PK + indexes -------------------
 alter table public.orders add column if not exists coupon text not null default '';

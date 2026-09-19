@@ -1462,6 +1462,16 @@ if (profileModal) {
     if (e.key === "Escape" && filtersSide.classList.contains("is-open")) closeFilters();
   });
 
+  /* never let a mobile drawer state leak to desktop: on wide screens the filters
+     are an always-visible sticky column, so drop the is-open/is-on overlay state */
+  let filtersResizeT;
+  window.addEventListener("resize", () => {
+    clearTimeout(filtersResizeT);
+    filtersResizeT = setTimeout(() => {
+      if (window.innerWidth > 900) closeFilters();
+    }, 120);
+  });
+
   document.querySelectorAll(".filter-group h3").forEach(h =>
     h.addEventListener("click", () => h.closest(".filter-group")?.classList.toggle("is-open")));
 
@@ -1689,7 +1699,7 @@ if (profileModal) {
     const mark = (tg.replace(/^[\s@+]/, "") || "؟").trim();
     const initial = escT((mark.charAt(0) || "؟").toUpperCase());
     return `
-      <div class="bought">
+      <div class="bought" style="--c:${rc}">
         <span class="bought__av" data-mark="${mark ? escT(mark) : ""}">
           <em>${initial}</em>
           ${av ? `<img src="${encImg(av)}" alt="${escT(tg)}" loading="lazy" onerror="this.remove()" />` : ""}
@@ -1700,7 +1710,7 @@ if (profileModal) {
         </span>
         <span class="bought__sep" aria-hidden="true"></span>
         <span class="bought__skin">
-          <span class="bought__gun" style="--c:${rc}">
+          <span class="bought__gun">
             ${img
               ? `<img src="${encImg(img)}" alt="" loading="lazy" onerror="this.remove()" />`
               : `<em>${weaponL ? escT(weaponL.charAt(0)) : "؟"}</em>`}
@@ -1718,6 +1728,7 @@ if (profileModal) {
     if (!approved.length) {
       latestEl.hidden = true;
       recentSlide.innerHTML = "";
+      stopLatest();
       if (latestCount) latestCount.textContent = "";
       return;
     }
@@ -1742,12 +1753,66 @@ if (profileModal) {
         itemCount++;
       });
     });
-    if (!chips) { latestEl.hidden = true; recentSlide.innerHTML = ""; return; }
-    /* auto-marquee only on wide screens; on phones use a native touch scroll */
-    const isMobileTrack = window.innerWidth <= 640;
-    const animate = !isMobileTrack && itemCount >= 4;
-    recentSlide.innerHTML = animate ? chips + chips : chips;
-    recentSlide.classList.toggle("is-anim", animate);
+    if (!chips) { latestEl.hidden = true; recentSlide.innerHTML = ""; stopLatest(); if (latestCount) latestCount.textContent = ""; return; }
+
+    /* don't rewind the running animation when nothing changed: re-renders happen on
+       every DB event / resize, and restarting the ticker would look like a broken loop */
+    const stableKey = itemCount + "|" + recent.map(o => o.id).join(",");
+    if (recentSlide._lk === stableKey) {
+      latestEl.hidden = false;
+      if (latestCount) {
+        latestCount.textContent =
+          (lang === "fa" ? showNum(itemCount) + " آیتم خرید اخیر ・ " + timeAgo(recent[0].date) : showNum(itemCount) + " recent items ・ " + timeAgo(recent[0].date));
+        latestCount.setAttribute("data-count", showNum(itemCount));
+        latestCount.setAttribute("data-time", timeAgo(recent[0].date));
+      }
+      return;
+    }
+    recentSlide._lk = stableKey;
+
+    latestEl.hidden = false; /* needs layout before any measuring */
+    stopLatest();
+    recentSlide.classList.remove("is-anim", "is-anim-single");
+
+    const reduce = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    const SPEED = 22; /* px per second — slow, calm crawl */
+
+    /* one copy is measured first so the wrap distance is exactly one period
+       (translateX 0 to -period) making the loop pixel-perfect with no jump */
+    recentSlide.innerHTML = chips;
+    const canAnim = !!(recentSlide.animate && !reduce);
+    let period = 0;
+    if (canAnim && itemCount === 1) {
+      /* two copies spaced one container-width apart: only a single chip is ever in
+         view, yet it still moves continuously and loops seamlessly off-screen */
+      recentSlide.style.columnGap = "14px";
+      const chip = recentSlide.querySelector(".bought");
+      const chipW = chip ? chip.offsetWidth : 120;
+      const cw = recentSlide.parentElement ? recentSlide.parentElement.clientWidth : 0;
+      period = Math.max(chipW + 1, chipW + cw + 14);
+      const spacerW = Math.max(1, period - chipW - 28);
+      recentSlide.innerHTML = chips + `<span class="recent__spacer" style="width:${spacerW}px"></span>` + chips;
+    } else if (canAnim) {
+      recentSlide.style.columnGap = "";
+      period = recentSlide.scrollWidth + 14; /* width of one set + the inter-copy gap */
+      recentSlide.innerHTML = chips + chips;
+    } else {
+      recentSlide.style.columnGap = "";
+    }
+    recentSlide.style.removeProperty("--tick-dur");
+
+    if (canAnim && period > 0) {
+      const dur = Math.max(6000, Math.round((period / SPEED) * 1000));
+      recentSlide._anim = recentSlide.animate(
+        [
+          { transform: "translateX(0px)" },
+          { transform: "translateX(-" + period + "px)" }
+        ],
+        { duration: dur, iterations: Infinity, easing: "linear" }
+      );
+      if (recentSlide._hover || document.hidden) tickerPause();
+    }
+
     if (latestCount) {
       latestCount.textContent =
         (lang === "fa" ? showNum(itemCount) + " آیتم خرید اخیر ・ " + timeAgo(recent[0].date) : showNum(itemCount) + " recent items ・ " + timeAgo(recent[0].date));
@@ -1756,7 +1821,30 @@ if (profileModal) {
     }
     latestEl.hidden = false;
   }
-renderLatest();
+  function stopLatest() {
+    if (recentSlide._anim) { try { recentSlide._anim.cancel(); } catch { /* ignore */ } recentSlide._anim = null; }
+  }
+  function tickerPause() {
+    if (recentSlide._anim) { try { recentSlide._anim.pause(); } catch { /* ignore */ } }
+  }
+  function tickerPlay() {
+    if (recentSlide._anim && !document.hidden && !recentSlide._hover) { try { recentSlide._anim.play(); } catch { /* ignore */ } }
+  }
+  (function initLatestHover() {
+    if (recentSlide._hh) return;
+    recentSlide._hh = true;
+    const host = recentSlide.closest ? recentSlide.closest(".recent") : null;
+    if (!host) return;
+    host.addEventListener("mouseenter", () => { recentSlide._hover = true; tickerPause(); });
+    host.addEventListener("mouseleave", () => { recentSlide._hover = false; tickerPlay(); });
+    document.addEventListener("visibilitychange", () => { document.hidden ? tickerPause() : tickerPlay(); });
+  })();
+  renderLatest();
+  let latestResizeT;
+  window.addEventListener("resize", () => {
+    clearTimeout(latestResizeT);
+    latestResizeT = setTimeout(renderLatest, 150);
+  });
 
   /* ---------- live DB updates (Supabase) ---------- */
   document.addEventListener("zeus-db-ready", () => {

@@ -181,10 +181,19 @@ function saveSetting(key, value) {
   setCache = setCache || {};
   setCache[key] = value == null ? "" : String(value);
   lsSet(K_SET, setCache);
-  if (DB_MODE && DB_READY) {
-    dbUpsert("site_settings", [{ key: key, value: setCache[key] }], "key");
-  }
+  if (DB_MODE && DB_READY) dbWriteSetting(key, setCache[key]);
   dbNotify({ type: "settings" });
+}
+/* Only the admin panel persists settings to the DB — and only while an admin
+   session is actually active. This keeps visitor pages (and the login page,
+   where saving the internal secret / a reset happens before any session exists)
+   from tripping site_settings RLS and alarming with a bogus "server error". */
+async function dbWriteSetting(key, value) {
+  if (typeof document === "undefined" || !document.querySelector(".admin__main")) return;
+  let ok = false;
+  try { ok = await dbEnsureSessionNow(); } catch { ok = false; }
+  if (!ok) return;
+  try { dbUpsert("site_settings", [{ key: String(key), value: String(value) }], "key"); } catch { /* ignore */ }
 }
 function saveHeroImg(dataUrl) {
   saveSetting("hero_img", dataUrl || "");
@@ -423,8 +432,9 @@ function placeOrder(o) {
     if (row.coupon) {
       tryInsert({ ...payBase, coupon: row.coupon }, err => {
         /* coupon column may be missing: retry without it and track the code as a marker item
-           so single-use is still enforced through couponUsedInOrders */
-        dbLog(err);
+           so single-use is still enforced through couponUsedInOrders.
+           The first failure here is expected & retried — do NOT toast "server error" for it. */
+        try { console.warn("ZEUSSHOP db: coupon insert retry:", err && err.message ? err.message : err); } catch { /* ignore */ }
         const items2 = [...(Array.isArray(row.items) ? row.items : []), { special: "coupon", code: String(row.coupon).toUpperCase() }];
         tryInsert({ ...payBase, items: items2 }, dbLog);
       });
@@ -488,35 +498,71 @@ function saveAnnouncement(a) {
   annCache = normAnn(a);
   lsSet(K_ANN, annCache);
   if (DB_MODE) dbOnReady(function () {
-    dbUpsert("announcement", [{ id: 1, enabled: annCache.enabled, text: annCache.text }], "id");
+    dbEnsureSessionNow().then(ok => {
+      if (ok) dbUpsert("announcement", [{ id: 1, enabled: annCache.enabled, text: annCache.text }], "id");
+    });
   });
   dbNotify({ type: "announcement" });
 }
 
-/* legacy creds — used ONLY in fallback (no DB) mode */
+/* ---------- admin panel credentials ----------
+   Default: admin / 1234. Stored in site_settings (changeable from the panel)
+   and mirrored to localStorage so the same login works before/without the DB.
+   Only this username+password opens the panel. */
 const getAdminCreds = () => {
-  return {
-    user: lsRawGet("skm_admin_user", null) || "admin",
-    pass: lsRawGet("skm_admin_pass", null) || "admin1380",
-  };
+  /* stored creds only count when deliberately saved from the panel;
+     otherwise legacy/stale values must not block the default admin/1234 */
+  const changed = lsRawGet("skm_creds_changed", "") === "1" ||
+    (typeof getSetting === "function" && getSetting("skm_creds_changed") === "1");
+  if (changed) {
+    const su = typeof getSetting === "function" ? getSetting("admin_user") : "";
+    const sp = typeof getSetting === "function" ? getSetting("admin_pass") : "";
+    if (su && sp) return { user: su, pass: sp };
+    const lu = lsRawGet("skm_admin_user", null);
+    const lp = lsRawGet("skm_admin_pass", null);
+    if (lu && lp) return { user: lu, pass: lp };
+  }
+  return { user: "admin", pass: "1234" };
 };
 const saveAdminCreds = (u, p) => {
-  lsSet("skm_admin_user", String(u || "admin"));
-  lsSet("skm_admin_pass", String(p || "admin1380"));
+  u = String(u || "admin");
+  p = String(p || "1234");
+  lsSet("skm_creds_changed", "1");
+  if (typeof saveSetting === "function") {
+    saveSetting("admin_user", u);
+    saveSetting("admin_pass", p);
+    saveSetting("skm_creds_changed", "1");
+  }
+  lsSet("skm_admin_user", u);
+  lsSet("skm_admin_pass", p);
+};
+/* forgotten creds → back to the default admin / 1234 (local + DB-mirrored flag) */
+const resetAdminCreds = () => {
+  try { localStorage.removeItem("skm_creds_changed"); } catch { /* ignore */ }
+  try { localStorage.removeItem("skm_admin_user"); } catch { /* ignore */ }
+  try { localStorage.removeItem("skm_admin_pass"); } catch { /* ignore */ }
+  if (typeof saveSetting === "function") saveSetting("skm_creds_changed", "0");
 };
 
 /* =========================================================
    Supabase sync layer (internals)
    ========================================================= */
+let dbToastT = 0;
 function dbLog(err) {
   DB_ERROR = err;
-  console.error("ZEUSSHOP db:", err && err.message ? err.message : err);
+  const msg = (err && err.message) ? String(err.message) : String(err || "");
+  console.error("ZEUSSHOP db:", msg);
   if (typeof showToast === "function" && document.body) {
-    try {
-      showToast(lang === "fa"
-        ? "خطا در ارتباط با سرور — تغییرات ذخیره نشد."
-        : "Cannot reach server — changes not saved.", true);
-    } catch { /* ignore */ }
+    const now = Date.now();
+    if (now - dbToastT > 2500) {   /* don't spam the same toast on every subscriber */
+      dbToastT = now;
+      try {
+        const shortMsg = msg.length > 96 ? msg.slice(0, 93) + "…" : msg;
+        showToast(lang === "fa"
+          ? "خطا در ارتباط با سرور — تغییرات ذخیره نشد." + (shortMsg ? " («" + shortMsg + "»)" : "")
+          : "Cannot reach server — changes not saved." + (shortMsg ? " («" + shortMsg + "»)" : ""), true);
+      } catch { /* ignore */ }
+    }
   }
   dbNotify({ type: "error" });
 }
@@ -574,6 +620,7 @@ function dbSyncOrders(list) {
    ---------------------------------------------------------- */
 async function dbSaveOrderDirect(o) {
   if (!DB_MODE || !supa || !DB_READY) return null;
+  if (!(await dbEnsureSessionNow())) return "not-signed-in";
   const base = {
     id: Number(o.id) || 0, telegram: String(o.telegram || ""),
     items: Array.isArray(o.items) ? o.items : [],
@@ -613,6 +660,7 @@ async function dbCheckoutAllowed(tg) {
 }
 async function dbDeleteOrderDirect(id) {
   if (!DB_MODE || !supa || !DB_READY) return null;
+  if (!(await dbEnsureSessionNow())) return "not-signed-in";
   try {
     const { data, error } = await supa.from("orders").delete().eq("id", Number(id) || 0);
     if (error) return error.message;
@@ -624,6 +672,7 @@ async function dbAddInventoryDirect(tg, items) {
   if (!DB_MODE || !supa || !DB_READY) return null;
   tg = String(tg || "").trim();
   if (!tg || !Array.isArray(items) || !items.length) return null;
+  if (!(await dbEnsureSessionNow())) return "not-signed-in";
   try {
     const mapped = items.filter(it => it && !it.special).map(it => ({
       telegram: tg, name: String(it && it.name || ""), price: Number(it && it.price) || 0,
@@ -885,12 +934,178 @@ function dbStartPolling() {
 const getSupa = () => supa;
 const isDbMode = () => DB_MODE && DB_READY && !!supa;
 
+/* bare username support: "zeus"  ->  "zeus@zeusshop.app".
+   Usernames may contain Persian / special characters — the Supabase account email is
+   always derived from a safe ASCII slug so it stays a valid address regardless. */
+const ADMIN_DOMAIN = "zeusshop.app";
+const normalizeAdminLogin = val => {
+  const v = String(val || "").trim().toLowerCase();
+  if (!v) return "";
+  if (v.includes("@")) {
+    /* already an email — accept only a well-formed address */
+    const m = v.match(/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/);
+    return m ? m[0] : "";
+  }
+  const slug = v.replace(/[^a-z0-9._-]+/g, "").replace(/^[^a-z0-9]+/, "").replace(/[._-]{2,}/g, ".");
+  return ((slug || "admin") + "@" + ADMIN_DOMAIN).toLowerCase();
+};
+
 async function dbAdminLogin(email, password) {
   if (!DB_MODE || !supa) return { error: "no-db" };
   try {
-    const { error } = await supa.auth.signInWithPassword({ email: String(email).trim(), password: String(password) });
+    const { error } = await supa.auth.signInWithPassword({ email: normalizeAdminLogin(email), password: String(password) });
     if (error) return { error: error.message };
+    try { await supa.rpc("admin_self_register"); } catch { /* ignore */ }
     return { ok: true };
+  } catch (e) { return { error: e.message || "err" }; }
+}
+
+/* Panel login is a simple username/password (default admin/1234). In DB mode we
+   also need a Supabase admin session so order approval / settings writes pass RLS.
+   Supabase requires a 6+ char account password, while the panel password can be
+   short (1234) — so the Supabase account is kept on its own internal strong secret
+   (managed here, mirrored to settings+localStorage). It is auto-created on first
+   login and reused afterwards. */
+const getSupabaseSecret = () => {
+  let s = lsRawGet("skm_supa_secret", "");
+  if (!s && typeof getSetting === "function") s = getSetting("admin_dbpass");
+  if (s) return s;
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  let out = "";
+  for (let i = 0; i < 16; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  s = "zx_" + out;
+  lsSet("skm_supa_secret", s);
+  if (typeof saveSetting === "function") saveSetting("admin_dbpass", s);
+  return s;
+};
+/* One guard for every admin write: if the Supabase session lapsed, re-establish it
+   from the panel credentials the admin set in settings — so a valid panel login alone
+   is enough for everything to persist ("full access"). Only admin-panel functions call
+   this (visitor flows are never routed through it), so it can't mint admins casually. */
+let dbSessionLock = null;
+async function dbEnsureSessionNow() {
+  if (!DB_MODE || !supa) return false;
+  try {
+    const { data, error } = await supa.auth.getUser();
+    if (!error && data && data.user) return true;
+  } catch { /* fallthrough to sign-in */ }
+  if (dbSessionLock) { try { return await dbSessionLock; } catch { return false; } }
+  dbSessionLock = (async () => {
+    try {
+      const creds = (typeof getAdminCreds === "function") ? getAdminCreds() : { user: "admin", pass: "1234" };
+      const r = await dbEnsureAdminAuth(String(creds.user || "admin"), String(creds.pass || ""));
+      return !!(r && r.ok);
+    } catch { return false; }
+  })();
+  try { return await dbSessionLock; } finally { dbSessionLock = null; }
+}
+/* Auth attempts are throttled & cached: Supabase rate-limits signup/signin per hour
+   ("email rate limit exceeded"), so we never blast it with duplicate attempts from
+   panel-load + settings-saves + write-guards. A detected rate-limit also locks further
+   network attempts for an hour instead of hammering the provider. */
+let dbAuthInflight = null;
+let dbAuthCacheT = 0;
+let dbAuthCacheRes = null;
+let dbAuthLockedUntil = 0;
+/* Only an explicit "login" submit may auto-CREATE the admin account (signUp sends a
+   confirmation email when "Confirm email" is ON, which burns Supabase's email quota and
+   trips rate limits). Background flows — panel auto-ensure, write guards — only sign IN. */
+let dbAllowSignUp = false;
+const dbSetAllowSignUp = v => { dbAllowSignUp = !!v; };
+async function dbEnsureAdminAuth(user, pass) {
+  if (!DB_MODE || !supa) return { ok: false, error: "no-db" };
+  if (Date.now() < dbAuthLockedUntil) return { ok: false, error: "rate-limit", message: "email rate limit exceeded" };
+  const email = normalizeAdminLogin(user);
+  if (!email) return { ok: false, error: "bad-username", message: "invalid username for db account" };
+  if (dbAuthInflight) return dbAuthInflight;
+  if (Date.now() - dbAuthCacheT < 5000 && dbAuthCacheRes) return dbAuthCacheRes;
+  dbAuthCacheT = Date.now();
+  dbAuthInflight = (async () => {
+    const secret = getSupabaseSecret();
+    const isBad = err => /invalid|wrong|credentials|not found|rate limit|too many/i.test(String(err || ""));
+    const isRate = err => /rate limit|too many requests|\b429\b/i.test(String(err || ""));
+    const lockIfRate = err => { if (isRate(err)) dbAuthLockedUntil = Date.now() + 60 * 60 * 1000; };
+    let res;
+    const r1 = await supa.auth.signInWithPassword({ email: email, password: secret });
+    if (!r1.error) {
+      try { await supa.rpc("admin_self_register"); } catch { /* ignore */ }
+      res = { ok: true };
+    } else if (isRate(r1.error.message)) {
+      res = { ok: false, error: "rate-limit", message: r1.error.message };
+      lockIfRate(r1.error.message);
+    } else if (!isBad(r1.error.message)) {
+      res = { ok: false, error: "signin", message: r1.error.message };
+    } else {
+      /* no account under the internal secret yet — first try the panel password so
+         accounts created by earlier versions keep working, then auto-create */
+      let okR = null;
+      if (String(pass || "")) {
+        const r2 = await supa.auth.signInWithPassword({ email: email, password: String(pass) });
+        if (!r2.error) {
+          try { await supa.rpc("admin_self_register"); } catch { /* ignore */ }
+          okR = { ok: true };
+        } else {
+          lockIfRate(r2.error.message);
+          if (isRate(r2.error.message)) res = { ok: false, error: "rate-limit", message: r2.error.message };
+        }
+      }
+      if (okR) {
+        res = okR;
+      } else if (!res) {
+        /* auto-creating the account only happens on an EXPLICIT login submit —
+           background flows must never fire signUp (it sends emails and trips
+           Supabase's rate limiter) */
+        if (!dbAllowSignUp) {
+          res = { ok: false, error: "no-account", message: "account not found — sign in with the database email/password" };
+        } else {
+          const signUpR = await supa.auth.signUp({ email: email, password: String(pass || secret), options: { emailRedirectTo: location.origin } })
+            .catch(e => ({ error: e }));
+          if (signUpR.error) {
+            lockIfRate(signUpR.error.message);
+            if (isRate(signUpR.error.message)) res = { ok: false, error: "rate-limit", message: signUpR.error.message };
+            else if (/already|exists|registered/i.test(String(signUpR.error.message || ""))) res = { ok: false, error: "conflict", message: signUpR.error.message };
+            else res = { ok: false, error: "signup", message: signUpR.error.message };
+          } else if (signUpR.data && signUpR.data.session) {
+            const reg = await supa.rpc("admin_self_register");
+            res = reg.error
+              ? { ok: false, error: "register", message: (reg.error && reg.error.message) || "err" }
+              : { ok: true };
+          } else {
+            res = { ok: false, error: "confirm-email" };
+          }
+        }
+      }
+    }
+    dbAuthCacheRes = res;
+    return res;
+  })().catch(e => {
+    dbAuthLockedUntil = 0;
+    return { ok: false, error: "err", message: (e && e.message) || "err" };
+  }).finally(() => { dbAuthInflight = null; });
+  return dbAuthInflight;
+}
+
+/* change admin username(email)/password on the Supabase Auth account */
+async function dbAdminChangeCreds(name, password) {
+  if (!DB_MODE || !supa) return { error: "no-db" };
+  const email = normalizeAdminLogin(name);
+  if (!email || email.length < 4) return { error: "bad-username" };
+  if (!(await dbEnsureSessionNow())) return { error: "not-signed-in" };
+  const s = await dbAdminSession();
+  if (!s || !s.user) return { error: "not-signed-in" };
+  const curEmail = String(s.user.email || "").toLowerCase();
+  const updates = {};
+  let emailChanged = false;
+  if (email.toLowerCase() !== curEmail) { updates.email = email; emailChanged = true; }
+  const p = String(password || "");
+  /* Supabase accounts need 6+ char passwords; a shorter panel password only
+     updates the panel login (the DB session keeps running on the internal secret) */
+  const shortPassword = (p && p.length < 6) ? p : "";
+  if (p && p.length >= 6) updates.password = p;
+  try {
+    const { error } = await supa.auth.updateUser(updates);
+    if (error) return { error: error.message };
+    return { ok: true, emailChanged, email, shortPassword: !!shortPassword };
   } catch (e) { return { error: e.message || "err" }; }
 }
 async function dbAdminSession() {
@@ -909,6 +1124,7 @@ async function removeUser(tg) {
   if (!tg) return "no-tg";
   try {
     if (DB_MODE && DB_READY && supa) {
+      if (!(await dbEnsureSessionNow())) return "not-signed-in";
       const r1 = await supa.from("users").delete().eq("tg", tg);
       if (r1.error) return r1.error.message;
       await supa.from("inventory").delete().eq("telegram", tg);

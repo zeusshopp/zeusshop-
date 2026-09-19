@@ -6,37 +6,37 @@
 /* ---------- session ---------- */
 async function checkSession() {
   const isLogin = !!$id("loginForm");
-  if (typeof DB_MODE === "boolean" && DB_MODE) {
-    /* wait until the Supabase layer finishes connecting/loading */
-    if (typeof DB_READY !== "boolean" || !DB_READY) {
-      try {
-        await new Promise(res => {
-          const h = () => { document.removeEventListener("zeus-db-ready", h); res(); };
-          document.addEventListener("zeus-db-ready", h);
-          setTimeout(h, 6000);
-        });
-      } catch { /* ignore */ }
-    }
-    if (typeof isDbMode === "function" && isDbMode()) {
-      const s = await dbAdminSession();
-      if (isLogin && s) { location.replace("admin.html"); return; }
-      if (!isLogin && !s) { location.replace("admin-login.html"); return; }
-      return;
-    }
-  }
+  const isPanel = !!document.querySelector(".admin__main");
   let sess = "";
   try { sess = localStorage.getItem("skm_admin") || ""; } catch { /* ignore */ }
-  if (isLogin) {
-    if (sess === "1") location.replace("admin.html");
-  } else if (sess !== "1") {
-    location.replace("admin-login.html");
-  }
+  if (isLogin && sess === "1") { location.replace("admin.html"); return; }
+  if (isPanel && sess !== "1") { location.replace("admin-login.html"); return; }
 }
 checkSession();
 
+/* ---------- keep the DB admin session alive while locally logged in ----------
+   The panel login (username/password set from inside the panel) is enough: on the
+   panel page we auto-create/refresh the matching Supabase session in the background,
+   so approve/reject/delete "just work" without a separate Supabase sign-in. */
+let dbSessionEnsured = null;
+{
+  const isPanel = !!document.querySelector(".admin__main");
+  let sess = "";
+  try { sess = localStorage.getItem("skm_admin") || ""; } catch { /* ignore */ }
+  if (isPanel && sess === "1" &&
+      typeof isDbMode === "function" && isDbMode() &&
+      typeof dbEnsureAdminAuth === "function") {
+    try {
+      const creds = (typeof getAdminCreds === "function") ? getAdminCreds() : { user: "admin", pass: "1234" };
+      dbSessionEnsured = dbEnsureAdminAuth(String(creds.user || "admin"), String(creds.pass || ""));
+    } catch { dbSessionEnsured = null; }
+  }
+}
+
 /* =========================================================
-   LOGIN PAGE — DB mode: Supabase email/password (secure)
-                 fallback: username / password (localStorage)
+   LOGIN PAGE — single username/password gate (default admin/1234,
+   editable from the panel). In DB mode it also keeps the matching
+   Supabase auth session alive so database writes keep working.
    ========================================================= */
 const loginForm = $id("loginForm");
 if (loginForm) {
@@ -51,40 +51,72 @@ if (loginForm) {
     errEl.classList.remove("is-on");
     if (submitBtn) submitBtn.disabled = true;
 
-    if (dbActive()) {
-      const email = userEl.value.trim();
-      const pass = passEl.value;
-      if (!email || !pass) {
-        errEl.textContent = lang === "fa" ? "ایمیل و رمز عبور را وارد کنید." : "Enter email and password.";
+    const u = userEl.value.trim();
+    const p = passEl.value;
+    if (!u || !p) {
+      errEl.textContent = lang === "fa" ? "نام کاربری و رمز عبور را وارد کنید." : "Enter username and password.";
+      errEl.classList.add("is-on");
+      if (submitBtn) submitBtn.disabled = false;
+      return;
+    }
+
+    const creds = (typeof getAdminCreds === "function") ? getAdminCreds() : { user: "admin", pass: "1234" };
+    const uOk = u.toLowerCase() === String(creds.user || "").toLowerCase();
+    const pOk = p === String(creds.pass || "");
+    const dbOn = dbActive();
+
+    /* LOGIN MODEL — one login only:
+       In DB mode the typed email/password IS the Supabase account: try a direct
+       sign-in with exactly what was typed first. If that fails but the typed
+       creds match the stored panel creds, fall back to the legacy internal
+       account (accounts created by previous versions keep working).
+       Accounts are only ever auto-created on an explicit login submit. */
+    if (dbOn) {
+      if (typeof dbSetAllowSignUp === "function") dbSetAllowSignUp(true);
+      let dbRes = { ok: false, error: "no-db" };
+      try {
+        if (typeof dbAdminLogin === "function") dbRes = await dbAdminLogin(u, p);
+      } catch { dbRes = { ok: false, error: "err", message: "err" }; }
+      if (!(dbRes && dbRes.ok) && uOk && pOk && typeof dbEnsureAdminAuth === "function") {
+        try { dbRes = await dbEnsureAdminAuth(creds.user, creds.pass); } catch { dbRes = { ok: false, error: "err" }; }
+      }
+      if (submitBtn) submitBtn.disabled = false;
+      if (dbRes && dbRes.ok === false && dbRes.error !== "no-db") {
+        let msg;
+        if (dbRes.error === "confirm-email") {
+          msg = lang === "fa"
+            ? "حساب ادمین ساخته نشد؛ «تأیید ایمیل» در تنظیمات دیتابیس روشن است. آن را خاموش کن و دوباره تلاش کن."
+            : "Admin account not created — “Confirm email” is ON in the database provider. Disable it and retry.";
+        } else if (dbRes.error === "rate-limit") {
+          msg = lang === "fa"
+            ? "محدودیت موقت سرویسور اعمال شده (rate limit). چند دقیقه بعد دوباره تلاش کن و فقط یک‌بار بزن."
+            : "Temporary server rate limit. Try again in a few minutes (single attempt).";
+        } else if (dbRes.error === "bad-username" || /invalid login|invalid apikey|credentials|wrong|not found/i.test(String(dbRes.message || ""))) {
+          msg = lang === "fa"
+            ? "ورود با حساب دیتابیس ممکن نشد؛ ایمیل یا رمز اشتباه است. اگر حسابی ساخته‌نشده، در تنظیمات دیتابیس یکی بساز (Auth → Users → Add user)."
+            : "Could not sign in with the database account — wrong email or password. Create one in the database provider if it doesn't exist (Auth → Users → Add user).";
+        } else {
+          msg = lang === "fa"
+            ? "ورود کامل نشد: " + (dbRes.message || dbRes.error || "err")
+            : "Login not completed: " + (dbRes.message || dbRes.error || "err");
+        }
+        errEl.textContent = msg;
         errEl.classList.add("is-on");
-        if (submitBtn) submitBtn.disabled = false;
         return;
       }
-      const res = await dbAdminLogin(email, pass);
+    } else if (!uOk || !pOk) {
+      errEl.textContent = lang === "fa" ? "نام کاربری یا رمز عبور اشتباه است." : "Wrong username or password.";
+      errEl.classList.add("is-on");
       if (submitBtn) submitBtn.disabled = false;
-      if (res && res.ok) {
-        showToast(lang === "fa" ? "ورود موفق ✓" : "Login successful ✓");
-        setTimeout(() => location.href = "admin.html", 400);
-      } else {
-        errEl.textContent = lang === "fa"
-          ? "ایمیل یا رمز عبور اشتباه است."
-          : (res && res.error && res.error !== "no-db") ? res.error : "Wrong email or password.";
-        errEl.classList.add("is-on");
-      }
-    } else {
-      const u = userEl.value.trim();
-      const p = passEl.value;
-      const creds = getAdminCreds();
-      if (u === creds.user && p === creds.pass) {
-        try { localStorage.setItem("skm_admin", "1"); } catch { /* ignore */ }
-        showToast(lang === "fa" ? "ورود موفق ✓" : "Login successful ✓");
-        setTimeout(() => location.href = "admin.html", 400);
-      } else {
-        errEl.textContent = lang === "fa" ? "نام کاربری یا رمز عبور اشتباه است." : "Wrong username or password.";
-        errEl.classList.add("is-on");
-      }
-      if (submitBtn) submitBtn.disabled = false;
+      return;
+    } else if (submitBtn) {
+      submitBtn.disabled = false;
     }
+
+    try { localStorage.setItem("skm_admin", "1"); } catch { /* ignore */ }
+    if (typeof saveAdminCreds === "function") { try { saveAdminCreds(u, p); } catch { /* ignore */ } }
+    showToast(lang === "fa" ? "ورود موفق ✓" : "Login successful ✓");
+    setTimeout(() => location.href = "admin.html", 400);
   });
   [userEl, passEl].forEach(el => el.addEventListener("input", () => errEl.classList.remove("is-on")));
 }
@@ -652,16 +684,9 @@ const tog = e.target.closest("[data-cp-toggle]");
     const orders = getOrders();
     const o = orders.find(x => x.id === id);
     if (!o) return;
-    if (typeof isDbMode === "function" && isDbMode()) {
-      const sess = await dbAdminSession();
-      if (!sess) {
-        showToast(FA("برای تأیید/رد سفارش‌ها باید با «ورود ادمین» و ایمیل Supabase وارد شوید؛ در غیر این صورت تغییر در دیتابیس ذخیره نمی‌شود و خریدار چیزی نمی‌بیند.", "Sign in via admin login to approve/reject orders, otherwise the change won't persist and buyers see nothing."), true);
-        return;
-      }
-    }
     const dbErrText = async err => FA(
-      "در دیتابیس ذخیره نشد (" + err + "). مطمئن شو با «ورود ادمین» و ایمیل Supabase وارد شده‌ای و کاربر در جدول public.admins دیتابیس ثبت است؛ سپس دوباره امتحان کن.",
-      "Not saved (" + err + "). Make sure you're signed in via admin login and your user is registered in the public.admins table, then try again."
+      "در دیتابیس ذخیره نشد (" + err + "). در صورت نیاز با همان نام کاربری و رمز پنل دوباره وارد شو و دوباره امتحان کن.",
+      "Not saved (" + err + "). Re-login with your panel username + password and try again if needed."
     );
     if (a) {
       if (typeof isDbMode === "function" && isDbMode()) {
@@ -1014,18 +1039,15 @@ const tog = e.target.closest("[data-cp-toggle]");
     showToast(FA("کاربر حذف شد ✓", "User deleted ✓"));
   });
 
-  /* ---------- settings: creds + announcement ---------- */
-  const setUser = $id("setUser"), setPass = $id("setPass"), setPass2 = $id("setPass2");
-  const saveCredsBtn = $id("saveCreds");
-  const credsFields = $id("credsFields");
+  /* ---------- settings: db status + announcement ---------- */
   const dbInfoBox = $id("dbInfoBox");
   const annEnabled = $id("annEnabled"), annText = $id("annText");
   const saveAnnBtn = $id("saveAnn");
 
   async function applyInfoBox() {
     const usingDb = typeof isDbMode === "function" && isDbMode();
-    if (credsFields) credsFields.hidden = usingDb;
     if (dbInfoBox && usingDb) {
+      if (dbSessionEnsured) { try { await dbSessionEnsured; } catch { /* ignore */ } dbSessionEnsured = null; }
       let email = "";
       try {
         const s = await dbAdminSession();
@@ -1034,39 +1056,37 @@ const tog = e.target.closest("[data-cp-toggle]");
       dbInfoBox.hidden = false;
       if (email) {
         dbInfoBox.innerHTML = FA(
-          `<b>اتصال به دیتابیس Supabase برقرار است ✓</b>
-           <span>شما با <u dir="ltr">${esc(email)}</u> وارد شده‌اید. تأیید/رد سفارش‌ها روی دیتابیس ذخیره می‌شود.</span>`,
-          `<b>Connected to Supabase database ✓</b>
+          `<b>اتصال به دیتابیس برقرار است ✓</b>
+           <span>شما با <u dir="ltr">${esc(email)}</u> وارد شده‌اید. تأیید/رد سفارش‌ها و حذف کاربر روی دیتابیس ذخیره می‌شود.</span>`,
+          `<b>Connected to database ✓</b>
            <span>Signed in as <u dir="ltr">${esc(email)}</u>. Approve/reject changes will persist.</span>`
         );
       } else {
         dbInfoBox.innerHTML = FA(
-          `<b>اتصال به دیتابیس برقرار است، اما وارد نشده‌اید ⚠</b>
-           <span>برای اینکه تأیید/رد سفارش‌ها و حذف کاربر روی دیتابیس ذخیره و برای خریداران نمایش داده شود، از تب «ورود ادمین» با ایمیل و رمز ادمین Supabase وارد شوید.</span>`,
-          `<b>Connected to database, but not signed in ⚠</b>
-           <span>Sign in via admin login (Supabase email + password) so approvals and deletions persist and are visible to buyers.</span>`
+          `<b>اتصال به دیتابیس برقرار است، اما ورود خودکار کامل نشد ⚠</b>
+           <span>برای اینکه تأیید/رد سفارش‌ها و حذف کاربر روی دیتابیس ذخیره شود، دکمه «ورود مجدد» را بزن و دوباره وارد شو.</span>
+           <button type="button" id="dbRelogin" class="btn btn--sm btn--primary">${lang === "fa" ? "ورود مجدد" : "Re-login"}</button>`,
+          `<b>Connected to database, but auto sign-in failed ⚠</b>
+           <span>Hit “Re-login” and sign in so approvals and deletions persist.</span>
+           <button type="button" id="dbRelogin" class="btn btn--sm btn--primary">Re-login</button>`
         );
+        const rl2 = dbInfoBox.querySelector("#dbRelogin");
+        if (rl2) rl2.addEventListener("click", () => {
+          try { localStorage.removeItem("skm_admin"); } catch { /* ignore */ }
+          location.href = "admin-login.html";
+        });
       }
-    } if (dbInfoBox) dbInfoBox.hidden = !usingDb;
+    } else if (dbInfoBox) {
+      dbInfoBox.hidden = false;
+      dbInfoBox.innerHTML = FA(
+        `<b>اتصال به دیتابیس برقرار نیست ⚠</b>
+         <span>تغییرات (تأیید/رد سفارش، حذف کاربر) فقط روی مرورگر ذخیره می‌شود.</span>`,
+        `<b>Not connected to the database ⚠</b>
+         <span>Changes (approve/reject, delete user) will only be stored locally.</span>`
+      );
+    }
   }
   applyInfoBox();
-
-  if (saveCredsBtn) {
-    const cur = getAdminCreds();
-    setUser.value = cur.user;
-    saveCredsBtn.addEventListener("click", () => {
-      const u = setUser.value.trim();
-      const p = setPass.value;
-      const p2 = setPass2.value;
-      if (!u) { showToast(FA("نام کاربری را وارد کنید", "Enter a username"), true); setUser.focus(); return; }
-      if (p && p.length < 4) { showToast(FA("رمز عبور باید حداقل ۴ کاراکتر باشد", "Password must be at least 4 characters"), true); setPass.focus(); return; }
-      if (p !== p2) { showToast(FA("تکرار رمز عبور مطابقت ندارد", "Passwords do not match"), true); setPass2.focus(); return; }
-      saveAdminCreds(u, p || cur.pass);
-      const nc = getAdminCreds();
-      showToast(FA(`اطلاعات ورود ذخیره شد ✓ (${nc.user})`, `Login saved ✓ (${nc.user})`));
-      setPass.value = ""; setPass2.value = "";
-    });
-  }
 
   if (saveAnnBtn) {
     const a = getAnnouncement();
@@ -1348,7 +1368,7 @@ async function wipeAndRestoreTable(supa, t, rows) {
 if (backupBtn) {
   backupBtn.addEventListener("click", async () => {
     if (!dbReadyNow()) {
-      showToast(lang === "fa" ? "بکاپ فقط در حالت Supabase فعال است." : "Backup works only in Supabase mode.", true);
+      showToast(lang === "fa" ? "بکاپ فقط در حالت دیتابیس فعال است." : "Backup works only in DB mode.", true);
       return;
     }
     backupBtn.disabled = true;
@@ -1372,7 +1392,7 @@ if (restoreBtn && restoreFile) {
     restoreFile.value = "";
     if (!file) return;
     if (!dbReadyNow()) {
-      showToast(lang === "fa" ? "بازیابی فقط در حالت Supabase فعال است." : "Restore works only in Supabase mode.", true);
+      showToast(lang === "fa" ? "بازیابی فقط در حالت دیتابیس فعال است." : "Restore works only in DB mode.", true);
       return;
     }
     const ok = window.confirm(lang === "fa"

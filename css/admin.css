@@ -132,6 +132,17 @@ input, select { font-family: inherit; }
 .login__err.is-on { display: block; animation: errIn .3s ease; }
 @keyframes errIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
+.login__divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 16px 0; color: var(--muted); font-size: .78rem;
+}
+.login__divider::before, .login__divider::after {
+  content: ""; flex: 1; height: 1px; background: rgba(240, 194, 75, .18);
+}
+#signupWrap { margin-top: 16px; }
+#signupWrap .login__sub { margin-bottom: 16px; }
+#suBtn { margin-top: 14px; }
+
 .login__back {
   display: block; text-align: center; margin-top: 20px;
   color: var(--muted); font-size: .85rem; transition: color .2s;
