@@ -64,6 +64,7 @@ let userCountCache = null;         // fallback count (RPC) when anonymous RLS hi
 let annCache = lsRawGet(K_ANN, null);
 let setCache = lsRawGet(K_SET, {});          // object key → value
 let heavyReady = false;                      // orders/users/inventory background load finished
+let dbHeavyStarted = false;                  // guard so the heavy load starts only once (even when kicked off early)
 let realtimeSeen = false;                    // set once a realtime event proves the channel works
 const hasRealtime = () => realtimeSeen;
 const isHeavyReady = () => heavyReady;
@@ -700,6 +701,10 @@ async function dbInit() {
   if (!Array.isArray(catCache)) catCache = lsGet(K_CAT, []);
   try {
     supa = supabaseLib.createClient(DB_URL, DB_KEY);
+    /* orders/inventory start loading right away, in parallel with the critical
+       tables — the "latest purchases" ticker then appears as fast as possible
+       instead of waiting for the critical load to finish first */
+    dbInitHeavy();
     /* critical / small tables first — the shop can render and the
        announcement can show as soon as these are in cache */
     const crit = await Promise.all([
@@ -748,25 +753,27 @@ async function dbInit() {
 /* heavy/large tables (orders · users · inventory) load in the background so
    they never delay the page; every table notifies the UI as soon as it lands */
 async function dbInitHeavy() {
-  if (!DB_MODE || !supa || !DB_READY) return;
+  if (!DB_MODE || !supa || dbHeavyStarted) return;
+  dbHeavyStarted = true;
   try {
-    const tasks = [fetchRows("orders"), fetchRows("inventory")];
-    if (IS_ADMIN_PAGE) tasks.push(fetchRows("users"));
-    const res = await Promise.all(tasks);
-    const [e2, d2] = res[0];
-    const [e3, d3] = res[1];
-    const e4 = res.length > 2 ? res[2][0] : null;
-    const d4 = res.length > 2 ? res[2][1] : [];
-    if (e2 || e3 || e4) {
-      console.warn("ZEUSSHOP db: some heavy tables failed — applying the ones that loaded.", e2 || e3 || e4);
-    }
-    if (!e2) { ordersCache = (d2 || []).map(normOrder); lsSet(K_ORD, ordersCache); dbNotify({ type: "orders" }); }
-    if (!e3) { invRowsCache = (d3 || []).map(normInv); lsSet(K_INV, invRowsCache); dbNotify({ type: "inventory" }); }
-    if (IS_ADMIN_PAGE && !e4) { usersCache = (d4 || []).map(normUser); lsSet(K_USR, usersCache); userCountCache = usersCache.length; }
-    if (userCountCache === null || userCountCache === 0) {
-      const c = await fetchUserCount();
+    /* notify each table the moment IT lands — the "latest purchases" ticker only
+       needs orders, so it must not wait for slower tables (inventory/users) */
+    const ordP = fetchRows("orders");
+    const invP = fetchRows("inventory");
+    const usrP = IS_ADMIN_PAGE ? fetchRows("users") : null;
+    const countP = (userCountCache === null || userCountCache === 0) ? fetchUserCount() : null;
+    let e2 = null, e3 = null, e4 = null;
+    ordP.then(r => { const e = r[0], d = r[1]; e2 = e; if (!e && Array.isArray(d)) { ordersCache = d.map(normOrder); lsSet(K_ORD, ordersCache); dbNotify({ type: "orders" }); } });
+    invP.then(r => { const e = r[0], d = r[1]; e3 = e; if (!e && Array.isArray(d)) { invRowsCache = d.map(normInv); lsSet(K_INV, invRowsCache); dbNotify({ type: "inventory" }); } });
+    if (usrP) usrP.then(r => { const e = r[0], d = r[1]; e4 = e; if (!e && Array.isArray(d)) { usersCache = d.map(normUser); lsSet(K_USR, usersCache); userCountCache = usersCache.length; } });
+    if (countP) {
+      const c = await countP;
       if (c !== null && Number.isFinite(Number(c))) userCountCache = Number(c);
     }
+    await ordP;
+    await invP;
+    if (usrP) await usrP;
+    if (e2 || e3 || e4) console.warn("ZEUSSHOP db: some heavy tables failed — applying the ones that loaded.", e2 || e3 || e4);
     dbNotify({ type: "users" });
     heavyReady = true;
   } catch (err) {
@@ -916,8 +923,8 @@ function dbStartPolling() {
     });
   };
   const fastMs = () => hasRealtime() ? 60000 : (isAdmin ? 15000 : 20000);
-  const heavyMs = () => hasRealtime() ? 90000 : (isAdmin ? 6000 : 25000);
-  const countMs = () => hasRealtime() ? 120000 : 45000;
+  const heavyMs = () => hasRealtime() ? 45000 : (isAdmin ? 6000 : 12000);
+  const countMs = () => hasRealtime() ? 90000 : 30000;
   const loop = (fn, ms) => { fn(); setTimeout(() => loop(fn, ms), ms()); };
   fast();
   heavy();
@@ -1149,7 +1156,7 @@ try {
   ["skm_custom_skins", "skm_deleted", "skm_orders", "skm_inventory", "skm_users", "skm_ann", "skm_hero"]
     .forEach(k => localStorage.removeItem(k));
 } catch { /* ignore */ }
-setCache = {}; annCache = null; ordersCache = []; invRowsCache = []; usersCache = [];
+setCache = {}; annCache = null; invRowsCache = []; usersCache = [];
 
 /* fire on load */
 if (DB_MODE && supabaseLib) {

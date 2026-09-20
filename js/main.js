@@ -1746,7 +1746,7 @@ if (profileModal) {
     recent.forEach(o => {
       (Array.isArray(o.items) ? o.items : []).forEach(it => {
         if (!it || typeof it !== "object" || it.special) return;
-        const key = o.id + "|" + String(it.name || "") + "|" + (Number(it.price) || 0);
+        const key = String(it.name || "");
         if (chipKeys.has(key)) return;
         chipKeys.add(key);
         chips += tickerChip(it, o);
@@ -1755,73 +1755,65 @@ if (profileModal) {
     });
     if (!chips) { latestEl.hidden = true; recentSlide.innerHTML = ""; stopLatest(); if (latestCount) latestCount.textContent = ""; return; }
 
-    /* don't rewind the running animation when nothing changed: re-renders happen on
-       every DB event / resize, and restarting the ticker would look like a broken loop */
-    const stableKey = itemCount + "|" + recent.map(o => o.id).join(",");
+    /* don't re-render when nothing changed: DB events and resize fire often, and
+       restarting the track would look like a broken jump; the overflow state is
+       part of the key so the static<->scroll flip reacts to width changes */
+    const cw = recentSlide.parentElement ? Math.max(0, recentSlide.parentElement.clientWidth - 16) : 0;
+    const stableKey = itemCount + "|W" + cw + "|" + recent.map(o => o.id).join(",");
     if (recentSlide._lk === stableKey) {
       latestEl.hidden = false;
       if (latestCount) {
         latestCount.textContent =
           (lang === "fa" ? showNum(itemCount) + " آیتم خرید اخیر ・ " + timeAgo(recent[0].date) : showNum(itemCount) + " recent items ・ " + timeAgo(recent[0].date));
-        latestCount.setAttribute("data-count", showNum(itemCount));
-        latestCount.setAttribute("data-time", timeAgo(recent[0].date));
       }
       return;
     }
     recentSlide._lk = stableKey;
 
-    latestEl.hidden = false; /* needs layout before any measuring */
+    latestEl.hidden = false;
+    const prevAnim = recentSlide._anim;
     stopLatest();
     recentSlide.classList.remove("is-anim", "is-anim-single");
 
-    const reduce = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    const SPEED = 22; /* px per second — slow, calm crawl */
-
-    /* one copy is measured first so the wrap distance is exactly one period
-       (translateX 0 to -period) making the loop pixel-perfect with no jump */
-    recentSlide.innerHTML = chips;
-    const canAnim = !!(recentSlide.animate && !reduce);
-    let period = 0;
-    const cw = recentSlide.parentElement ? recentSlide.parentElement.clientWidth : 0;
-    const overflow = cw > 0 && recentSlide.scrollWidth > cw;
-    if (canAnim && itemCount === 1) {
-      /* two copies spaced one container-width apart: only a single chip is ever in
-         view, yet it still moves continuously and loops seamlessly off-screen */
-      recentSlide.style.columnGap = "14px";
-      const chip = recentSlide.querySelector(".bought");
-      const chipW = chip ? chip.offsetWidth : 120;
-      period = Math.max(chipW + 1, chipW + cw + 14);
-      const spacerW = Math.max(1, period - chipW - 28);
-      recentSlide.innerHTML = chips + `<span class="recent__spacer" style="width:${spacerW}px"></span>` + chips;
-    } else if (canAnim && overflow) {
-      /* content already spills past the container: two copies loop seamlessly, and a
-         chip never appears twice on screen at the same time */
-      recentSlide.style.columnGap = "";
-      period = recentSlide.scrollWidth + 14; /* width of one set + the inter-copy gap */
-      recentSlide.innerHTML = chips + chips;
-    } else {
-      /* few items: render them exactly once so what's visible = the real purchases */
-      recentSlide.style.columnGap = "";
+    /* carry the marquee phase across refreshes instead of restarting from zero */
+    let prog = 0;
+    if (prevAnim) {
+      const dd = prevAnim.effect && prevAnim.effect.getTiming ? prevAnim.effect.getTiming().duration : 0;
+      if (dd > 0) { const tt = prevAnim.currentTime || 0; prog = (tt % dd) / dd; }
+      if (!Number.isFinite(prog)) prog = 0;
     }
-    recentSlide.style.removeProperty("--tick-dur");
 
-    if (canAnim && period > 0) {
-      const dur = Math.max(6000, Math.round((period / SPEED) * 1000));
-      recentSlide._anim = recentSlide.animate(
-        [
-          { transform: "translateX(0px)" },
-          { transform: "translateX(-" + period + "px)" }
-        ],
-        { duration: dur, iterations: Infinity, easing: "linear" }
-      );
-      if (recentSlide._hover || document.hidden) tickerPause();
+    /* static until the items overflow the row; only then does the strip scroll */
+    recentSlide.innerHTML = chips;
+    recentSlide.style.columnGap = "";
+    recentSlide.style.removeProperty("--tick-dur");
+    const reduce = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    const canAnim = !!(recentSlide.animate && !reduce);
+    if (canAnim && recentSlide.scrollWidth > cw) {
+      /* two identical halves (parking gap rides INSIDE each half) keep the -50%
+         loop seam-perfect while the second half hides past the far edge at rest */
+      const G = Math.max(1, cw - recentSlide.scrollWidth - 36);
+      recentSlide.innerHTML = chips + `<span class="recent__spacer" style="width:${G}px"></span>`
+                           + chips + `<span class="recent__spacer" style="width:${G}px"></span>`;
+      const half = recentSlide.scrollWidth / 2;
+      if (half > 0) {
+        const dur = Math.max(6000, Math.min(30000, Math.round((half / 44) * 1000)));
+        const anim = recentSlide.animate(
+          [
+            { transform: "translateX(0px)" },
+            { transform: "translateX(-50%)" }
+          ],
+          { duration: dur, iterations: Infinity, easing: "linear" }
+        );
+        if (prog > 0) { try { anim.pause(); anim.currentTime = prog * dur; anim.play(); } catch { /* ignore */ } }
+        recentSlide._anim = anim;
+        if (recentSlide._hover || document.hidden) tickerPause();
+      }
     }
 
     if (latestCount) {
       latestCount.textContent =
         (lang === "fa" ? showNum(itemCount) + " آیتم خرید اخیر ・ " + timeAgo(recent[0].date) : showNum(itemCount) + " recent items ・ " + timeAgo(recent[0].date));
-      latestCount.setAttribute("data-count", showNum(itemCount));
-      latestCount.setAttribute("data-time", timeAgo(recent[0].date));
     }
     latestEl.hidden = false;
   }
@@ -1877,7 +1869,7 @@ if (profileModal) {
    ========================================================= */
 function animateCount(el) {
   if (!el) return;
-  const target = +el.dataset.count;
+  const target = +String(el.dataset.count || "0").replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d));
   const prefix = el.dataset.prefix || "";
   const dur = 1400, start = performance.now();
   const step = now => {
