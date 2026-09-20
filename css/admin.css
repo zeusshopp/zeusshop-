@@ -1018,63 +1018,6 @@ select.field-input option, select.field__input option {
   background: #0c0a08;
   color: var(--text);
 }
-.dd { position: relative; }
-.dd__hidden {
-  position: absolute; width: 1px; height: 1px;
-  opacity: 0; pointer-events: none; clip: rect(0 0 0 0);
-}
-.dd__btn {
-  width: 100%; min-height: 44px;
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  background: rgba(7, 6, 4, .75);
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-  color: var(--text);
-  padding: 12px 14px;
-  font-family: inherit; font-size: .95rem; cursor: pointer;
-  text-align: start; overflow: hidden; white-space: nowrap;
-  transition: border-color .25s, box-shadow .25s, background .25s;
-}
-.dd__btn::after {
-  content: ""; width: 8px; height: 8px; flex-shrink: 0;
-  border-right: 2px solid var(--accent); border-bottom: 2px solid var(--accent);
-  transform: rotate(45deg);
-  transition: transform .2s; opacity: .8;
-}
-.dd__dot {
-  width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255, .35);
-  box-shadow: 0 0 7px rgba(255, 255, 255, .22);
-}
-.dd.is-open .dd__btn::after { transform: rotate(225deg); }
-.dd__btn:hover { border-color: rgba(240, 194, 75, .5); }
-.dd__btn:focus-visible, .dd.is-open .dd__btn {
-  outline: none; border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(240, 194, 75, .18), 0 0 18px rgba(240, 194, 75, .2);
-}
-.dd__list {
-  position: absolute; z-index: 60;
-  inset-inline: 0; top: calc(100% + 6px);
-  background: linear-gradient(180deg, #131009, #0e0b08);
-  border: 1px solid rgba(240, 194, 75, .3); border-radius: 12px;
-  box-shadow: 0 16px 44px rgba(0, 0, 0, .6);
-  overflow-y: auto; max-height: 260px;
-  padding: 6px;
-  animation: dd-in .16s ease;
-}
-.dd__list[hidden] { display: none; }
-@keyframes dd-in {
-  from { opacity: 0; transform: translateY(-5px); }
-  to   { opacity: 1; transform: none; }
-}
-.dd__item {
-  display: flex; align-items: center; gap: 9px; width: 100%; text-align: start;
-  background: transparent; border: 0; color: var(--muted);
-  font-family: inherit; font-size: .9rem; line-height: 1.5;
-  padding: 10px 12px; border-radius: 8px; cursor: pointer;
-  transition: background .15s, color .15s;
-}
-.dd__item:hover { background: rgba(240, 194, 75, .1); color: var(--text); }
-.dd__item.is-picked { background: rgba(240, 194, 75, .16); color: var(--accent); font-weight: 700; }
 .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
 
 /* ---------- IMAGE PICKER (choose a skin image) ---------- */
