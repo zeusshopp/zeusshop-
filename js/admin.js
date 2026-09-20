@@ -149,10 +149,22 @@ if (adminMain) {
       wrap.appendChild(list);
 
       const lab = o => (o ? isEsc(o.textContent || o.value || "") : "");
+      /* rarity options get a real colored dot (emoji don't render on every system) */
+      const RAR_COLOR = {
+        consumer: "#b8bec9", industrial: "#5e98d9", milspec: "#4b69ff",
+        restricted: "#8847ff", classified: "#d32ce6", covert: "#eb4b4b", extraordinary: "#ffce1f",
+      };
+      const rarityLab = o => {
+        const t = o ? (o.textContent || o.value || "") : "";
+        const c = o ? RAR_COLOR[o.value] : null;
+        if (!c) return lab(o);
+        const clean = t.replace(/^\S+\s+/, "").trim() || t;
+        return `<span class="dd__dot" style="background:${c}"></span><span>${isEsc(clean)}</span>`;
+      }; 
       const close = () => { wrap.classList.remove("is-open"); list.hidden = true; btn.setAttribute("aria-expanded", "false"); };
       const sync = () => {
         const picked = sel.selectedOptions && sel.selectedOptions[0];
-        btn.textContent = lab(picked);
+        btn.innerHTML = rarityLab(picked);
         Array.from(list.children).forEach(it =>
           it.classList.toggle("is-picked", it.dataset.v === sel.value));
       };
@@ -164,7 +176,7 @@ if (adminMain) {
           it.className = "dd__item";
           it.setAttribute("role", "option");
           it.dataset.v = o.value;
-          it.textContent = lab(o);
+          it.innerHTML = rarityLab(o);
           it.addEventListener("click", () => {
             sel.value = o.value;
             sync();
@@ -640,6 +652,19 @@ const tog = e.target.closest("[data-cp-toggle]");
     });
   }
 
+  /* remove a bought skin from the shop catalog (no confirm dialog — runs on approve) */
+  function autoRemoveSkin(name) {
+    let custom = getCustom();
+    let deleted = getDel();
+    if (custom.some(s => s.name === name)) {
+      custom = custom.filter(s => s.name !== name);
+    } else {
+      deleted.push(name);
+    }
+    saveCustom(custom);
+    saveDel(deleted);
+  }
+
   async function ordersClickHandler(e) {
     const rc = e.target.closest("[data-receipt]");
     if (rc) {
@@ -709,6 +734,10 @@ const tog = e.target.closest("[data-cp-toggle]");
           saveCoupons(cl);
         }
       }
+      /* bought skins are single units: once approved, remove them from the shop catalog */
+      (o.items || []).forEach(it => {
+        if (it && !it.special && it.name) autoRemoveSkin(String(it.name));
+      });
     } else if (r) {
       if (typeof isDbMode === "function" && isDbMode()) {
         o.status = "rejected";
@@ -736,7 +765,7 @@ const tog = e.target.closest("[data-cp-toggle]");
     saveOrders(orders);
     renderAll();
     showToast(a
-      ? FA(`سفارش تایید شد؛ آیتم‌ها به اینونتوری ${o.telegram} اضافه شد ✓`, `Order approved; items added to ${o.telegram}'s inventory ✓`)
+      ? FA(`سفارش تایید شد؛ آیتم‌ها به اینونتوری ${o.telegram} اضافه و از فروشگاه حذف شدند ✓`, `Order approved; items added to ${o.telegram}'s inventory and removed from the shop ✓`)
       : FA("سفارش رد شد.", "Order rejected."));
   }
   const ordersListEl = $id("ordersList");

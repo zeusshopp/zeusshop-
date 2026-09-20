@@ -1782,21 +1782,25 @@ if (profileModal) {
     recentSlide.innerHTML = chips;
     const canAnim = !!(recentSlide.animate && !reduce);
     let period = 0;
+    const cw = recentSlide.parentElement ? recentSlide.parentElement.clientWidth : 0;
+    const overflow = cw > 0 && recentSlide.scrollWidth > cw;
     if (canAnim && itemCount === 1) {
       /* two copies spaced one container-width apart: only a single chip is ever in
          view, yet it still moves continuously and loops seamlessly off-screen */
       recentSlide.style.columnGap = "14px";
       const chip = recentSlide.querySelector(".bought");
       const chipW = chip ? chip.offsetWidth : 120;
-      const cw = recentSlide.parentElement ? recentSlide.parentElement.clientWidth : 0;
       period = Math.max(chipW + 1, chipW + cw + 14);
       const spacerW = Math.max(1, period - chipW - 28);
       recentSlide.innerHTML = chips + `<span class="recent__spacer" style="width:${spacerW}px"></span>` + chips;
-    } else if (canAnim) {
+    } else if (canAnim && overflow) {
+      /* content already spills past the container: two copies loop seamlessly, and a
+         chip never appears twice on screen at the same time */
       recentSlide.style.columnGap = "";
       period = recentSlide.scrollWidth + 14; /* width of one set + the inter-copy gap */
       recentSlide.innerHTML = chips + chips;
     } else {
+      /* few items: render them exactly once so what's visible = the real purchases */
       recentSlide.style.columnGap = "";
     }
     recentSlide.style.removeProperty("--tick-dur");
