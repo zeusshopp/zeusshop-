@@ -653,18 +653,35 @@ async function dbSaveOrderDirect(o) {
   const coupon = String(o.coupon || "").trim().toUpperCase();
   const row = coupon ? { ...base, coupon } : base;
   try {
+    /* THIS CLIENT RETURNS NO ROWS FOR MUTATIONS UNLESS .select() IS CHAINED —
+       .select() is what appends `Prefer: return=representation`. Without it even a
+       SUCCESSFUL update looked like "0 rows affected", so the code fell through to
+       the insert branch and RLS rejected that insert:
+       "new row violates row-level security policy for table orders".
+       (verified against the bundled supabase.min.js: update/delete/insert all expose
+       .select() and only .select() sets return=representation) */
+    const normErr = e => {
+      const m = String((e && e.message) || e || "err");
+      return /row-level security/i.test(m)
+        ? "no-access: this admin session can't see/write the order (green box + public.admins)"
+        : m;
+    };
     /* 1) plain UPDATE (existing row, admin-only) */
-    const u = await supa.from("orders").update(row).eq("id", Number(o.id) || 0);
-    if (u.error) return (u.error && u.error.message) || "err";
+    const u = await supa.from("orders").update(row).eq("id", Number(o.id) || 0).select("*");
+    if (u.error) return normErr(u.error);
     if (u.data && u.data.length > 0) return null;
-    /* 2) row missing → try an insert (guarded policy applies) */
-    const ins = await supa.from("orders").insert([row])
-      .then(r => r.error ? (r.error.message || "err") : (r.data && r.data.length > 0 ? null : "no-rows-affected"))
-      .catch(e => (e && e.message) || "err");
+    /* 2) row truly missing → insert fallback (guarded policy applies) */
+    const insRes = r => {
+      if (r.error) return normErr(r.error);
+      return (r.data && r.data.length > 0) ? null : "no-rows-affected";
+    };
+    const ins = await supa.from("orders").insert([row]).select("*")
+      .then(insRes)
+      .catch(e => normErr(e));
     if (ins && coupon && /coupon/i.test(ins)) {
-      const again = await supa.from("orders").insert([base])
-        .then(r => r.error ? (r.error.message || "err") : (r.data && r.data.length > 0 ? null : "no-rows-affected"))
-        .catch(e => (e && e.message) || "err");
+      const again = await supa.from("orders").insert([base]).select("*")
+        .then(insRes)
+        .catch(e => normErr(e));
       return again;
     }
     return ins;
@@ -685,7 +702,9 @@ async function dbDeleteOrderDirect(id) {
   if (!DB_MODE || !supa || !DB_READY) return null;
   if (!(await dbEnsureSessionNow())) return "not-signed-in";
   try {
-    const { data, error } = await supa.from("orders").delete().eq("id", Number(id) || 0);
+    /* .select() required: without it this client returns no rows for DELETE, so a
+       successful delete looked like "no-rows-affected" and the panel showed an error */
+    const { data, error } = await supa.from("orders").delete().eq("id", Number(id) || 0).select("*");
     if (error) return error.message;
     if (!data || !data.length) return "no-rows-affected";
     return null;
@@ -703,7 +722,9 @@ async function dbAddInventoryDirect(tg, items) {
       wear: String(it && it.wear || ""), rarity: String(it && it.rarity || ""),
       type: String(it && it.type || ""), created_at: new Date().toISOString(),
     }));
-    const { data, error } = await supa.from("inventory").insert(mapped);
+    /* .select() required: a successful INSERT returns no rows otherwise, which was
+       reported as "no-rows-affected" right after the order had already been approved */
+    const { data, error } = await supa.from("inventory").insert(mapped).select("*");
     if (error) return error.message;
     if (!data || !Array.isArray(data) || data.length === 0) return "no-rows-affected";
     return null;
