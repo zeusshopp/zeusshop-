@@ -7,7 +7,7 @@
   <title>ZEUSSHOP — خرید و فروش اسکین CS2</title>
   <link rel="icon" type="image/png" href="image/fav.png" />
   <link rel="stylesheet" href="css/fonts.css?v=87" />
-  <link rel="stylesheet" href="css/style.css?v=101" />
+  <link rel="stylesheet" href="css/style.css?v=109" />
   <link rel="stylesheet" href="css/admin.css?v=89" />
 </head>
 <body>
@@ -121,15 +121,19 @@
     </div>
   </section>
 
-  <!-- ===== LAST PURCHASES ===== -->
+  <!-- ===== LAST PURCHASES (native scroll rail) ===== -->
   <div class="latest" id="latestBuy" hidden>
     <div class="container">
       <div class="latest__head">
         <span class="latest__label"><i class="latest__dot" aria-hidden="true"></i><span data-i18n="latestLabel">آخرین خریدهای تاییدشده</span></span>
         <span class="latest__count" id="latestCount"></span>
       </div>
-      <div class="recent">
-        <div class="recent__track" id="recentSlide" aria-live="polite"></div>
+      <div class="rail" id="recentRail">
+        <div class="recent" id="recentScroll">
+          <div class="recent__track" id="recentSlide" aria-live="polite"></div>
+        </div>
+        <i class="rail__fade rail__fade--s" aria-hidden="true"></i>
+        <i class="rail__fade rail__fade--e" aria-hidden="true"></i>
       </div>
     </div>
   </div>
@@ -421,6 +425,6 @@
   <script src="js/supabase.min.js?v=1"></script>
   <script src="js/supabase-config.js?v=87"></script>
   <script src="js/db.js?v=109"></script>
-  <script src="js/main.js?v=114"></script>
+  <script src="js/main.js?v=125"></script>
 </body>
 </html>

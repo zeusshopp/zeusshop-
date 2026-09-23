@@ -1702,10 +1702,18 @@ if (profileModal) {
 
   renderCart();
 
-  /* ---------- آخرین خریدهای تاییدشده (بنر متحرک افقی) ---------- */
+  /* ---------- آخرین خریدهای تاییدشده (مارکیِ CSS با حرکت خودکار) ----------
+     The endless motion is a pure-CSS translateX marquee on the track: it
+     starts with the stylesheet, so no JS error can ever freeze it. JS only
+     (a) duplicates the set until one period always fits the viewport,
+     (b) tunes speed via --rail-dur / --rail-shift, (c) freezes it while the
+     user holds or pans, and (d) falls back to scrollLeft writes when an old
+     cached stylesheet has no marquee rule (partial upload still moves). */
   const latestEl = $id("latestBuy");
   const recentSlide = $id("recentSlide");
   const latestCount = $id("latestCount");
+  const recentScroll = $id("recentScroll");   /* overflow-x container     */
+  const recentRail = $id("recentRail");       /* wrapper: edge fades */
 
   function avatarOf(tg) {
     const uname = tgUsername(tg);
@@ -1745,16 +1753,162 @@ if (profileModal) {
         </span>
       </div>`;
   }
+
+  /* ---------- rail engine ---------- */
+  const railReduce = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const rail = { loop: 0, hold: false, holdSince: 0, target: 46, last: 0, vel: 46, frame: 0, css: false, selfWrite: false };
+
+  /* console diagnostics: __zeusRailDebug() → tells you exactly WHY it is paused */
+  window.__zeusRailDebug = function () {
+    const d = {
+      loop: rail.loop, hold: rail.hold, css: rail.css,
+      dur: recentSlide && recentSlide.style ? recentSlide.style.getPropertyValue("--rail-dur") : "",
+      reduce: railReduce, tabHidden: document.hidden,
+      sectionHidden: !!(latestEl && latestEl.hidden),
+      scrollW: recentScroll ? recentScroll.scrollWidth : -1,
+      clientW: recentScroll ? recentScroll.clientWidth : -1,
+      scrollLeft: recentScroll ? recentScroll.scrollLeft : -1,
+      sets: recentSlide ? recentSlide.children.length : -1
+    };
+    d.pausedBy =
+      d.sectionHidden ? "section-hidden"
+      : d.tabHidden ? "tab-hidden"
+      : !d.loop ? "loop-0"
+      : d.hold ? "hold"
+      : (recentRail && recentRail.classList.contains("is-panning")) ? "panning"
+      : "RUNNING";
+    return d;
+  };
+
+  /* The marquee is endless in both directions (enough copies), so the edge
+     fades stay on; only a strip with nothing to scroll hides them. */
+  function railFades() {
+    if (recentRail) recentRail.classList.toggle("is-static", !rail.loop);
+  }
+
+  /* how far the user may pan: every point of the track must stay covered by
+     (copies - 1) periods + the viewport, or a blank gap could open at the
+     tail while the marquee keeps sliding */
+  function railMaxOK() {
+    if (!recentScroll || !rail.loop) return 0;
+    return Math.max(0, (recentSlide.children.length - 1) * rail.loop - recentScroll.clientWidth);
+  }
+
+  /* keep a user pan inside the covered range — never while a gesture runs */
+  function railNormalize() {
+    if (!recentScroll || rail.hold) return;
+    const sl = recentScroll.scrollLeft;
+    const maxOK = railMaxOK();
+    if (sl < 0) recentScroll.scrollLeft = 0;
+    else if (sl > maxOK) recentScroll.scrollLeft = maxOK;
+  }
+
+  /* Does the stylesheet own the motion? New CSS = translateX marquee on the
+     track (pure CSS — impossible for a JS error to freeze). Old cached CSS has
+     no marquee rule -> JS drives scrollLeft instead, so even a PARTIAL upload
+     can never leave the strip dead. */
+  function railCssOwns() {
+    if (!recentSlide || !window.getComputedStyle) return false;
+    const an = window.getComputedStyle(recentSlide).animationName || "";
+    return an.indexOf("rail-marquee") !== -1;
+  }
+
+  /* Duplicate the set until (copies - 1) periods always cover the viewport
+     (one full period must always be reachable — the old two-copy math stalled
+     a set narrower than the screen), then publish the marquee's period shift
+     and a duration that keeps a constant speed. Re-run periodically so late
+     layout (webfonts, images, resize) re-measures. */
+  function railEnsureLoop() {
+    if (!recentScroll || !recentSlide) { rail.loop = 0; return; }
+    const one = recentSlide.firstElementChild;
+    const viewport = recentScroll.clientWidth;
+    if (!one || !viewport) { rail.loop = 0; return; }
+    const setW = one.getBoundingClientRect().width;
+    if (!(setW > 0)) {
+      rail.loop = 0;
+      if (recentRail) recentRail.classList.add("is-static");
+      return;
+    }
+    const need = Math.ceil((viewport + 32) / setW) + 1;
+    const sets = recentSlide.children;
+    while (sets.length < need) {
+      const clone = one.cloneNode(true);
+      clone.setAttribute("aria-hidden", "true");
+      recentSlide.appendChild(clone);
+    }
+    while (sets.length > need) recentSlide.removeChild(recentSlide.lastElementChild);
+    rail.loop = setW;                        /* one set = exactly one period */
+    rail.css = railCssOwns();
+    if (recentSlide.style) {
+      recentSlide.style.setProperty("--rail-shift", -(100 / sets.length) + "%");
+      recentSlide.style.setProperty("--rail-dur", Math.max(8, setW / rail.target) + "s");
+    }
+    if (recentRail) recentRail.classList.remove("is-static");
+  }
+
+  function railTick(ts) {
+    requestAnimationFrame(railTick);
+    if (!recentScroll || !latestEl || latestEl.hidden) { rail.last = ts || 0; return; }
+    rail.frame = (rail.frame + 1) % 90;
+    if (!rail.loop || rail.frame === 0) railEnsureLoop();  /* self-heal + re-measure ~1.5s */
+    /* safety net: a pointerup/cancel we never saw must not hold it forever */
+    if (rail.hold && rail.holdSince && (Date.now() - rail.holdSince) > 6000) {
+      rail.hold = false; rail.holdSince = 0;
+    }
+    if (recentRail) recentRail.classList.toggle("is-hold", rail.hold);
+    railFades();
+    if (rail.css) return;                   /* CSS marquee owns the motion */
+
+    /* --- fallback: stylesheet without the marquee rule (stale CSS) --- */
+    if (!rail.last) rail.last = ts;
+    const dt = Math.min(0.06, Math.max(0, (ts - rail.last) / 1000));
+    rail.last = ts;
+    const panning = recentRail && recentRail.classList.contains("is-panning");
+    if (!rail.loop || rail.hold || panning) {
+      rail.vel *= Math.exp(-dt * 8);        /* decelerate, then ramp back up */
+      if (rail.vel < 1) rail.vel = 0;
+      return;
+    }
+    rail.vel += (rail.target - rail.vel) * Math.min(1, dt * 8);
+    let sl = recentScroll.scrollLeft + rail.vel * dt;
+    if (sl >= rail.loop) sl -= rail.loop;
+    rail.selfWrite = true;                  /* scroll listener: ignore our own write */
+    recentScroll.scrollLeft = sl;
+  }
+  if (recentScroll) requestAnimationFrame(railTick);
+  /* webfonts can widen the chips after first paint — re-measure once ready */
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { rail.loop = 0; });
+
+  function setLatestCount(itemCount, recent) {
+    if (!latestCount || !recent || !recent[0]) return;
+    latestCount.textContent =
+      (lang === "fa" ? showNum(itemCount) + " آیتم خرید اخیر ・ " + timeAgo(recent[0].date)
+                     : showNum(itemCount) + " recent items ・ " + timeAgo(recent[0].date));
+  }
+
+  function hideLatest() {
+    if (latestEl) latestEl.hidden = true;
+    if (recentSlide) { recentSlide.innerHTML = ""; recentSlide._lk = ""; }
+    rail.loop = 0;
+    if (latestCount) latestCount.textContent = "";
+  }
+
+  /* one set is drawn here; railEnsureLoop duplicates it as often as needed —
+     each .recent__set is exactly one period, so the wrap seam stays invisible */
+  function railBuild(chips) {
+    if (!recentScroll || !recentSlide) return;
+    const keep = recentScroll.scrollLeft;
+    recentSlide.innerHTML = '<div class="recent__set">' + chips + "</div>";
+    rail.loop = 0;
+    railEnsureLoop();
+    recentScroll.scrollLeft = Math.max(0, Math.min(keep, railMaxOK()));
+    railFades();
+  }
+
   function renderLatest() {
     if (!latestEl || !recentSlide) return;
     const approved = getOrders().filter(o => o.status === "approved");
-    if (!approved.length) {
-      latestEl.hidden = true;
-      recentSlide.innerHTML = "";
-      stopLatest();
-      if (latestCount) latestCount.textContent = "";
-      return;
-    }
+    if (!approved.length) { hideLatest(); return; }
     const seen = new Set();
     const uniq = approved.filter(o => {
       if (!o || seen.has(o.id)) return false;
@@ -1776,88 +1930,86 @@ if (profileModal) {
         itemCount++;
       });
     });
-    if (!chips) { latestEl.hidden = true; recentSlide.innerHTML = ""; stopLatest(); if (latestCount) latestCount.textContent = ""; return; }
+    if (!chips) { hideLatest(); return; }
 
-    /* don't re-render when nothing changed: DB events and resize fire often, and
-       restarting the track would look like a broken jump; the overflow state is
-       part of the key so the static<->scroll flip reacts to width changes */
-    const cw = recentSlide.parentElement ? Math.max(0, recentSlide.parentElement.clientWidth - 16) : 0;
-    const stableKey = itemCount + "|W" + cw + "|" + recent.map(o => o.id).join(",");
+    /* Don't rebuild when nothing changed: DB events and resizes fire often and
+       a rebuild would visibly restart the strip. Width is bucketed to 48px so a
+       URL-bar/scrollbar twitch can't re-key it, while a real width change still
+       flips the rail between static and scrolling. */
+    const railW = recentScroll ? Math.round(recentScroll.clientWidth / 48) : 0;
+    const stableKey = itemCount + "|W" + railW + "|" + recent.map(o => o.id).join(",");
     if (recentSlide._lk === stableKey) {
       latestEl.hidden = false;
-      if (latestCount) {
-        latestCount.textContent =
-          (lang === "fa" ? showNum(itemCount) + " آیتم خرید اخیر ・ " + timeAgo(recent[0].date) : showNum(itemCount) + " recent items ・ " + timeAgo(recent[0].date));
-      }
+      setLatestCount(itemCount, recent);
+      railFades();
       return;
     }
     recentSlide._lk = stableKey;
+    latestEl.hidden = false;   /* MUST be visible before measuring: while hidden
+                                  the section is display:none, clientWidth is 0 and
+                                  the rail would be built (and stay) static forever */
+    railBuild(chips);
+    setLatestCount(itemCount, recent);
+  }
 
-    latestEl.hidden = false;
-    const prevAnim = recentSlide._anim;
-    stopLatest();
-    recentSlide.classList.remove("is-anim", "is-anim-single");
+  (function initRail() {
+    if (!recentScroll || recentScroll._in) return;
+    recentScroll._in = true;
+    let pid = null, dragging = false, startX = 0, startSL = 0;
 
-    /* carry the marquee phase across refreshes instead of restarting from zero */
-    let prog = 0;
-    if (prevAnim) {
-      const dd = prevAnim.effect && prevAnim.effect.getTiming ? prevAnim.effect.getTiming().duration : 0;
-      if (dd > 0) { const tt = prevAnim.currentTime || 0; prog = (tt % dd) / dd; }
-      if (!Number.isFinite(prog)) prog = 0;
-    }
-
-    /* static until the items overflow the row; only then does the strip scroll */
-    recentSlide.innerHTML = chips;
-    recentSlide.style.columnGap = "";
-    recentSlide.style.removeProperty("--tick-dur");
-    const reduce = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    const canAnim = !!(recentSlide.animate && !reduce);
-    if (canAnim && recentSlide.scrollWidth > cw) {
-      /* two identical halves (parking gap rides INSIDE each half) keep the -50%
-         loop seam-perfect while the second half hides past the far edge at rest */
-      const G = Math.max(1, cw - recentSlide.scrollWidth - 36);
-      recentSlide.innerHTML = chips + `<span class="recent__spacer" style="width:${G}px"></span>`
-                           + chips + `<span class="recent__spacer" style="width:${G}px"></span>`;
-      const half = recentSlide.scrollWidth / 2;
-      if (half > 0) {
-        const dur = Math.max(6000, Math.min(30000, Math.round((half / 44) * 1000)));
-        const anim = recentSlide.animate(
-          [
-            { transform: "translateX(0px)" },
-            { transform: "translateX(-50%)" }
-          ],
-          { duration: dur, iterations: Infinity, easing: "linear" }
-        );
-        if (prog > 0) { try { anim.pause(); anim.currentTime = prog * dur; anim.play(); } catch { /* ignore */ } }
-        recentSlide._anim = anim;
-        if (recentSlide._hover || document.hidden) tickerPause();
+    /* Hold freezes the auto-advance on every device; on top of that, mice can
+       drag the strip (touch & trackpad already pan through native scrolling). */
+    recentScroll.addEventListener("pointerdown", e => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      rail.hold = true; rail.holdSince = Date.now();
+      if (e.pointerType === "mouse") {
+        pid = e.pointerId; dragging = true;
+        startX = e.clientX; startSL = recentScroll.scrollLeft;
+        if (recentRail) recentRail.classList.add("is-dragging");
+        try { recentScroll.setPointerCapture(e.pointerId); } catch { /* ignore */ }
       }
-    }
+    });    recentScroll.addEventListener("pointermove", e => {
+      if (!dragging || e.pointerId !== pid) return;
+      recentScroll.scrollLeft = Math.max(0, Math.min(startSL - (e.clientX - startX), railMaxOK()));  /* follows cursor, inside covered range */
+      railFades();
+    });
+    /* Release is bound to WINDOW: a pointerup/cancel outside the strip (or an
+       event the element never saw) must never be able to freeze the rail. */
+    const release = () => {
+      if (!rail.hold && !dragging) return;
+      rail.hold = false; rail.holdSince = 0;
+      if (dragging) {
+        const capPid = pid;
+        dragging = false; pid = null;
+        if (recentRail) recentRail.classList.remove("is-dragging");
+        if (capPid !== null) { try { recentScroll.releasePointerCapture(capPid); } catch { /* ignore */ } }
+      }
+      railNormalize();
+      railFades();
+    };
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
 
-    if (latestCount) {
-      latestCount.textContent =
-        (lang === "fa" ? showNum(itemCount) + " آیتم خرید اخیر ・ " + timeAgo(recent[0].date) : showNum(itemCount) + " recent items ・ " + timeAgo(recent[0].date));
-    }
-    latestEl.hidden = false;
-  }
-  function stopLatest() {
-    if (recentSlide._anim) { try { recentSlide._anim.cancel(); } catch { /* ignore */ } recentSlide._anim = null; }
-  }
-  function tickerPause() {
-    if (recentSlide._anim) { try { recentSlide._anim.pause(); } catch { /* ignore */ } }
-  }
-  function tickerPlay() {
-    if (recentSlide._anim && !document.hidden && !recentSlide._hover) { try { recentSlide._anim.play(); } catch { /* ignore */ } }
-  }
-  (function initLatestHover() {
-    if (recentSlide._hh) return;
-    recentSlide._hh = true;
-    const host = recentSlide.closest ? recentSlide.closest(".recent") : null;
-    if (!host) return;
-    host.addEventListener("mouseenter", () => { recentSlide._hover = true; tickerPause(); });
-    host.addEventListener("mouseleave", () => { recentSlide._hover = false; tickerPlay(); });
-    document.addEventListener("visibilitychange", () => { document.hidden ? tickerPause() : tickerPlay(); });
+    /* NO hover-pause on purpose: resting the mouse over the strip must not stop
+       it. Press-&-hold (and touch) is the deliberate way to freeze it. */
+
+    /* A scroll event can only mean the USER is panning (the CSS marquee never
+       touches scrollLeft, and fallback writes flag themselves): hold the
+       animation for the gesture + momentum, then let it resume. */
+    let panT = 0;
+    recentScroll.addEventListener("scroll", () => {
+      if (rail.selfWrite) { rail.selfWrite = false; return; }  /* our own fallback write */
+      if (!rail.hold) railNormalize();
+      if (recentRail) recentRail.classList.add("is-panning");
+      clearTimeout(panT);
+      panT = setTimeout(() => {
+        if (recentRail) recentRail.classList.remove("is-panning");
+        railNormalize();
+      }, 180);
+      railFades();
+    }, { passive: true });
   })();
+
   renderLatest();
   let latestResizeT;
   window.addEventListener("resize", () => {

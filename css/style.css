@@ -1619,17 +1619,10 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
   .searchbar.is-open { height: 46px; }
   #searchInput { font-size: .85rem; padding: 9px 10px; }
   .ann-modal__box { padding: 26px 20px 22px; }
-  .recent {
-    padding: 12px 4px;
-    border-radius: 14px;
-  }
-  .recent::before, .recent::after { display: none; }
-  .recent__track { gap: 10px; }
-  .bought { flex-shrink: 0; padding: 7px 12px 7px 9px; gap: 9px; border-radius: 14px; }
-  .bought__av { width: 38px; height: 38px; flex-basis: 38px; }
-  .bought__gun { width: 32px; height: 32px; flex-basis: 32px; }
-  .bought__meta { max-width: 120px; }
-  .latest__label { font-size: .72rem; }
+  /* NOTE: .latest / .recent / .bought responsive rules were removed from here —
+     they were declared BEFORE the base rules (which live later, in the
+     "GOLD POLISH" section) and therefore never won. They now live in the
+     "LAST PURCHASES — responsive" block at the very END of this file. */
 }
 
 /* --- Mobile hamburger (phones only) --- */
@@ -1652,8 +1645,6 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
   .ann-modal { padding: 12px; }
   .ann-modal__box { padding: 22px 16px 18px; }
   .ann-modal__icon { width: 50px; height: 50px; font-size: 1.4rem; }
-  .bought__meta { max-width: 96px; }
-  .bought__who-item b { font-size: .74rem; }
   .container { padding: 0 16px; }
   .hero__cta .btn { flex: 1; min-width: 0; padding: 12px 18px; }
 }
@@ -1710,7 +1701,7 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
 
 /* ===== Last purchases feed (homepage) ===== */
 .latest {
-  padding: 20px 0 26px;
+  padding: 24px 0 34px;
   overflow: hidden;
   animation: latestSection .7s ease-out both;
 }
@@ -1720,12 +1711,18 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
 }
 .latest__head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-wrap: wrap; /* long (EN) label + badge wrap instead of colliding on narrow screens */
   margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(240,194,75,.12);
 }
 .latest__label {
   display: inline-flex; align-items: center; gap: 9px;
   font-size: .84rem; font-weight: 800; letter-spacing: .3px; color: var(--accent);
   text-transform: uppercase;
+  background: linear-gradient(90deg, var(--accent), #ffe9a8 55%, var(--accent));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 .latest__dot {
   position: relative;
@@ -1752,6 +1749,8 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
   border: 1px solid rgba(240,194,75,.22);
   color: var(--text);
   white-space: nowrap;
+  min-width: 0; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis;
 }
 .latest__count::before {
   content: ""; width: 7px; height: 7px; border-radius: 50%;
@@ -1759,43 +1758,82 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
   animation: latest-pulse 1.6s ease-out infinite;
 }
 
-/* horizontal live ticker */
+/* =========================================================
+   horizontal live ticker → NATIVE SCROLL RAIL with auto-advance
+   The "animation" is only scrollLeft nudged by rAF; there is no transform
+   math and no loop-phase bookkeeping, so it cannot jump or desync.
+   Touch & trackpad pan natively; mouse drags; buttons page.
+   ========================================================= */
+.rail {
+  position: relative;
+  overflow: hidden;                 /* clips fades/buttons to the rounded frame */
+  border-radius: var(--rail-r, 18px);
+}
+/* a slow glint sweeping the frame — pure CSS, always alive */
+.rail::after {
+  content: ""; position: absolute; inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 32%, rgba(255,255,255,.05) 46%, rgba(240,194,75,.16) 50%, rgba(255,255,255,.05) 54%, transparent 68%);
+  background-size: 260% 100%;
+  background-position: 130% 0;
+  animation: railGlint 5.5s linear infinite;
+  pointer-events: none; z-index: 4;
+}
+@keyframes railGlint { to { background-position: -130% 0; } }
 .recent {
   position: relative;
-  overflow: hidden;
-  padding: 18px 8px;
+  direction: ltr;                   /* identical scrollLeft semantics on every browser */
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-behavior: auto;               /* rAF writes scrollLeft — 'smooth' would fight it */
+  scrollbar-width: none;            /* Firefox */
+  -ms-overflow-style: none;         /* old Edge */
+  padding: 18px 0;      /* NO horizontal padding here: each .recent__set carries its
+                           own start/end padding, so one set's box width is exactly
+                           one period and scrollWidth/2 wraps with a perfect seam */
   cursor: grab;
-  border-radius: 18px;
-  border: 1px solid rgba(240,194,75,.16);
+  border-radius: var(--rail-r, 18px);
+  border: 1px solid transparent;    /* gradient border painted by the last background layer */
   background:
-    linear-gradient(180deg, rgba(255,255,255,.03), transparent 45%),
-    radial-gradient(560px 130px at 50% -30%, rgba(240,194,75,.10), transparent 60%),
-    var(--card);
+    linear-gradient(180deg, rgba(255,255,255,.03), transparent 45%) padding-box,
+    radial-gradient(560px 130px at 50% -30%, rgba(240,194,75,.12), transparent 60%) padding-box,
+    linear-gradient(var(--card), var(--card)) padding-box,
+    linear-gradient(180deg, rgba(240,194,75,.55), rgba(240,194,75,.10) 55%, rgba(240,194,75,.42)) border-box;
   box-shadow: 0 14px 40px rgba(0,0,0,.30), inset 0 1px 0 rgba(240,194,75,.10);
 }
-.recent::before, .recent::after { display: none; }
+.recent::-webkit-scrollbar { display: none; }
+.rail.is-dragging .recent { cursor: grabbing; }
 .recent__track {
-  display: flex; align-items: center; gap: 14px;
-  direction: ltr;
-  width: max-content;
+  display: flex; align-items: center; width: max-content;
+  animation: rail-marquee var(--rail-dur, 60s) linear infinite;
   will-change: transform;
 }
-.recent__spacer { flex: none; }
-.recent__track.is-anim { animation: recent-marquee var(--tick-dur, 52s) linear infinite; }
-.recent__track.is-anim-single { animation: recent-marquee-single var(--tick-dur, 18s) linear infinite; }
-.recent:hover .recent__track.is-anim, .recent:hover .recent__track.is-anim-single { animation-play-state: paused; }
-@keyframes recent-marquee {
+@keyframes rail-marquee {
   from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
+  to   { transform: translateX(var(--rail-shift, -25%)); }
 }
-@keyframes recent-marquee-single {
-  from { transform: translateX(var(--tick-from, 100%)); }
-  to   { transform: translateX(var(--tick-to, -100%)); }
+/* the strip freezes only while a finger/mouse holds it or the user pans */
+.rail.is-hold .recent__track,
+.rail.is-panning .recent__track { animation-play-state: paused; }
+/* two identical sets: padding-inline-end makes one set's box width == visual
+   period, so scrollWidth/2 wraps with a mathematically perfect seam */
+.recent__set { display: flex; align-items: center; gap: 14px; padding-inline: 10px 14px; }
+
+/* edge fades live on the WRAPPER — they must not scroll with the content */
+.rail__fade {
+  position: absolute; top: 1px; bottom: 1px; width: 56px;
+  pointer-events: none; z-index: 3;
+  opacity: 1; transition: opacity .35s ease;
 }
+.rail__fade--s { left: 0;  background: linear-gradient(to right, color-mix(in srgb, var(--card) 96%, transparent), transparent); }
+.rail__fade--e { right: 0; background: linear-gradient(to left,  color-mix(in srgb, var(--card) 96%, transparent), transparent); }
+.rail.is-static .rail__fade { opacity: 0; }
 
 .bought {
   display: flex; align-items: center; gap: 10px;
   direction: rtl;
+  flex: none;                      /* pills never shrink inside the rail */
   padding: 8px 16px 8px 10px;
   border-radius: 999px;
   background:
@@ -1811,18 +1849,25 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
   animation: .35s both;
   animation-name: boughtEnter;
 }
-.bought:hover {
-  border-color: color-mix(in srgb, var(--c, #f0c24b) 68%, transparent);
-  transform: translateY(-2px);
-  box-shadow:
-    0 14px 34px rgba(0,0,0,.48),
-    0 0 28px color-mix(in srgb, var(--c, #f0c24b) 20%, transparent),
-    inset 0 1px 0 rgba(240,194,75,.16);
+/* lift only for real pointers — touch devices must not get a sticky hover */
+@media (hover: hover) and (pointer: fine) {
+  .bought:hover {
+    border-color: color-mix(in srgb, var(--c, #f0c24b) 68%, transparent);
+    transform: translateY(-2px);
+    box-shadow:
+      0 14px 34px rgba(0,0,0,.48),
+      0 0 28px color-mix(in srgb, var(--c, #f0c24b) 20%, transparent),
+      inset 0 1px 0 rgba(240,194,75,.16);
+  }
 }
 @keyframes boughtEnter {
   from { opacity: 0; transform: translateX(12px) scale(.97); }
   to   { opacity: 1; transform: translateX(0) scale(1); }
 }
+/* a soft 3-step ripple when a set is (re)built — reads as one calm wave */
+.recent__set .bought:nth-child(3n+2) { animation-delay: .06s; }
+.recent__set .bought:nth-child(3n)   { animation-delay: .12s; }
+
 .bought__av {
   position: relative; width: 42px; height: 42px; flex: 0 0 42px;
   border-radius: 50%; overflow: hidden;
@@ -1837,10 +1882,10 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
   font-style: normal; font-weight: 800; color: var(--accent); font-size: .95rem;
 }
 .bought__who-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.bought__who-item b { color: var(--text); font-size: .8rem; white-space: nowrap; }
+.bought__who-item b { color: var(--text); font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
 .bought__who-item i { font-style: normal; font-size: .62rem; color: #3ddc84; font-weight: 600; }
 .bought__sub { font-style: normal; font-weight: 600; }
-.bought__sep { width: 1px; height: 26px; background: rgba(240,194,75,.2); flex: 0 0 1px; }
+.bought__sep { width: 1px; height: 26px; background: rgba(240,194,75,.3); flex: 0 0 1px; }
 .bought__skin { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .bought__gun {
   position: relative; width: 36px; height: 36px; flex: 0 0 36px;
@@ -1858,7 +1903,13 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
 }
 .bought__meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 150px; }
 .bought__meta b { font-size: .74rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bought__meta i { font-style: normal; font-size: .64rem; color: var(--accent); font-weight: 700; }
+.bought__meta i {
+  font-style: normal; font-size: .64rem; color: var(--accent); font-weight: 700;
+  padding: 2px 8px; border-radius: 999px;
+  background: rgba(240,194,75,.10);
+  border: 1px solid rgba(240,194,75,.28);
+  align-self: flex-start; line-height: 1.3;
+}
 
 /* ===== Admin/login shared base ===== */
 html:has(body.login) { overflow: auto; }
@@ -1998,3 +2049,67 @@ html:has(body.login) { overflow: auto; }
 }
 .pay-code__copy:hover { background: rgba(240,194,75,.12); }
 .pay-ok__note { font-size: .82rem; line-height: 1.85; max-width: 300px; }
+
+/* =========================================================
+   LAST PURCHASES (.latest / .recent / .bought) — RESPONSIVE
+   These MUST stay at the end of the file: same specificity as the base
+   rules above, so source order is what makes them win on small screens.
+   ========================================================= */
+@media (max-width: 1080px) {
+  .latest { padding: 18px 0 22px; }
+  .bought__meta { max-width: 134px; }
+  .bought__who-item b { max-width: 132px; }
+}
+
+@media (max-width: 900px) { /* tablets */
+  .latest { padding: 16px 0 20px; }
+  .rail { --rail-r: 16px; }
+  .recent { padding: 14px 0; }
+  .rail__fade { width: 34px; }
+  .recent__set { gap: 12px; padding-inline: 10px 12px; }
+  .bought { padding: 8px 14px 8px 10px; }
+  .bought__av { width: 40px; height: 40px; flex-basis: 40px; }
+}
+
+@media (max-width: 640px) { /* phones */
+  .latest { padding: 14px 0 18px; }
+  .latest__head { margin-bottom: 10px; gap: 8px; }
+  .latest__label { font-size: .72rem; gap: 7px; }
+  .latest__count { font-size: .63rem; padding: 4px 10px; gap: 6px; }
+  .rail { --rail-r: 14px; }
+  .recent { padding: 12px 0; }
+  .rail__fade { width: 24px; }
+  .recent__set { gap: 10px; padding-inline: 8px 10px; }
+  .bought { flex-shrink: 0; padding: 7px 12px 7px 9px; gap: 9px; border-radius: 14px; }
+  .bought:hover { transform: none; }
+  .bought__av { width: 38px; height: 38px; flex-basis: 38px; }
+  .bought__gun { width: 32px; height: 32px; flex-basis: 32px; }
+  .bought__sep { height: 22px; }
+  .bought__meta { max-width: 112px; }
+  .bought__meta b { font-size: .7rem; }
+  .bought__meta i { font-size: .6rem; }
+  .bought__who-item b { font-size: .76rem; max-width: 100px; }
+  .bought__who-item i { font-size: .58rem; }
+  .bought__skin { gap: 7px; }
+}
+
+@media (max-width: 400px) { /* very small phones */
+  .latest__label { font-size: .68rem; letter-spacing: 0; }
+  .latest__count { font-size: .6rem; padding: 4px 9px; }
+  .rail { --rail-r: 13px; }
+  .recent { padding: 10px 0; }
+  .rail__fade { width: 18px; }
+  .bought { padding: 6px 11px 6px 8px; gap: 8px; }
+  .bought__av { width: 34px; height: 34px; flex-basis: 34px; }
+  .bought__av em { font-size: .82rem; }
+  .bought__gun { width: 28px; height: 28px; flex-basis: 28px; }
+  .bought__meta { max-width: 96px; }
+  .bought__who-item b { font-size: .72rem; max-width: 82px; }
+  .bought__sep { height: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .latest, .bought { animation: none !important; }
+  .latest__dot::after, .latest__count::before { animation: none !important; }
+  .rail::after { animation: none !important; }   /* decorative glint only — the marquee keeps moving */
+}
