@@ -411,11 +411,18 @@ function addUser(tg) {
   next.push({ id: id, tg: tg, date: new Date().toISOString() });
   usersCache = next;
   lsSet(K_USR, usersCache);
-  /* insert-only: RLS lets anonymous users INSERT (DO NOTHING on duplicate);
-     upsert would need UPDATE rights (admin-only) and fail on the shop page */
+  /* insert-only: RLS lets anonymous users INSERT. Duplicate protection goes through
+     upsert()+ignoreDuplicates because THIS client build's .insert() silently IGNORES
+     {onConflict,ignoreDuplicates} (they only work on .upsert()) — so the 2nd insert of
+     the same telegram (entered at the telegram step, then again on receipt submit)
+     used to throw duplicate key "users_tg_key" and toast a scary save error.
+     Prefer: resolution=ignore-duplicates → ON CONFLICT DO NOTHING needs no UPDATE
+     right, so it still passes the public-only INSERT policy. */
   if (DB_MODE) dbOnReady(function () {
-    supa.from("users").insert([{ id: id, tg, date: new Date().toISOString() }], { ignoreDuplicates: true, onConflict: "tg" })
-      .then(r => { if (r.error) dbLog(r.error); }).catch(dbLog);
+    const isDup = e => /duplicate|unique|users_tg_key/i.test(String((e && e.message) || e || ""));
+    supa.from("users").upsert([{ id: id, tg, date: new Date().toISOString() }], { onConflict: "tg", ignoreDuplicates: true })
+      .then(r => { if (r.error && !isDup(r.error)) dbLog(r.error); })
+      .catch(e => { if (!isDup(e)) dbLog(e); });
   });
   dbNotify({ type: "users" });
 }
@@ -427,7 +434,10 @@ function placeOrder(o) {
   if (DB_MODE) dbOnReady(function () {
     const payBase = { id: row.id, telegram: row.telegram, items: row.items, total: row.total, status: row.status, date: row.date };
     const tryInsert = (payload, cb) => {
-      supa.from("orders").insert([payload], { onConflict: "id" })
+      /* this client build ignores onConflict on .insert() — .upsert() honors it.
+         ignoreDuplicates → ON CONFLICT DO NOTHING (no UPDATE right needed), so a
+         repeated/same-millisecond order id can never crash the checkout. */
+      supa.from("orders").upsert([payload], { onConflict: "id", ignoreDuplicates: true })
         .then(r => { if (r.error) cb(r.error); }).catch(cb);
     };
     /* final-attempt failure: the order exists ONLY in this browser, the admin
@@ -1016,13 +1026,23 @@ const normalizeAdminLogin = val => {
 };
 
 async function dbAdminLogin(email, password) {
-  if (!DB_MODE || !supa) return { error: "no-db" };
+  if (!DB_MODE || !supa) return { ok: false, error: "no-db" };
   try {
     const { error } = await supa.auth.signInWithPassword({ email: normalizeAdminLogin(email), password: String(password) });
-    if (error) return { error: error.message };
+    if (error) {
+      /* MUST carry ok:false — the login page only shows a message when ok === false.
+         Returning a bare { error } used to make it treat a FAILED database sign-in
+         as success, open the panel without any session and leave the yellow
+         "auto sign-in incomplete" box (no pending orders, approvals not saved). */
+      const m = String(error.message || "");
+      const code = /rate limit|too many|429/i.test(m) ? "rate-limit"
+        : /invalid|credential|not found|wrong|apikey/i.test(m) ? "bad-credentials"
+        : "signin";
+      return { ok: false, error: code, message: m };
+    }
     try { await supa.rpc("admin_self_register"); } catch { /* ignore */ }
     return { ok: true };
-  } catch (e) { return { error: e.message || "err" }; }
+  } catch (e) { return { ok: false, error: "signin", message: (e && e.message) || "err" }; }
 }
 
 /* Panel login is a simple username/password (default admin/1234). In DB mode we
@@ -1123,7 +1143,12 @@ async function dbEnsureAdminAuth(user, pass) {
         if (!dbAllowSignUp) {
           res = { ok: false, error: "no-account", message: "account not found — sign in with the database email/password" };
         } else {
-          const signUpR = await supa.auth.signUp({ email: email, password: String(pass || secret), options: { emailRedirectTo: location.origin } })
+          /* Supabase rejects passwords < 6 chars: a short panel password (e.g. "1234")
+             used to make this signUp FAIL silently every time, so no DB account ever
+             got created → the panel stayed on the yellow "auto sign-in incomplete"
+             box forever. Fall back to the internal strong secret instead. */
+          const signUpPw = (String(pass || "").length >= 6) ? String(pass) : secret;
+          const signUpR = await supa.auth.signUp({ email: email, password: signUpPw, options: { emailRedirectTo: location.origin } })
             .catch(e => ({ error: e }));
           if (signUpR.error) {
             lockIfRate(signUpR.error.message);
