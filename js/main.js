@@ -1196,16 +1196,39 @@ if (profileModal) {
     if (payModalEl) payModalEl.classList.remove("is-open");
     if (payOverlay) payOverlay.classList.remove("is-open");
   }
+  /* receipts are stored base64 INSIDE the order row: an untouched 8 MB photo makes
+     the orders query so heavy it times out and the admin panel shows nothing.
+     Shrink it (like the hero image) before it ever reaches the database. */
+  function shrinkReceipt(dataUrl, cb) {
+    const img = new Image();
+    img.onload = () => {
+      const MAXW = 1400;
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (!w || !h) { cb(dataUrl); return; }
+      if (w > MAXW) { h = Math.round(h * MAXW / w); w = MAXW; }
+      try {
+        const cv = document.createElement("canvas");
+        cv.width = w; cv.height = h;
+        cv.getContext("2d").drawImage(img, 0, 0, w, h);
+        const out = cv.toDataURL("image/webp", .82);
+        cb((!out || out.length >= dataUrl.length) ? dataUrl : out);
+      } catch { cb(dataUrl); }
+    };
+    img.onerror = () => cb(dataUrl);
+    img.src = dataUrl;
+  }
   function setReceiptFile(f) {
     if (!f || !/^image\//.test(f.type)) { showToast(t("payDropBad"), true); return; }
     if (f.size > 8 * 1024 * 1024) { showToast(t("payDropBig"), true); return; }
     const fr = new FileReader();
     if (fr.error) return;
     fr.onload = () => {
-      payDataUrl = String(fr.result || "");
-      if (payPrev) payPrev.setAttribute("src", payDataUrl);
-      if (payPrevWrap) payPrevWrap.hidden = false;
-      if (paySubmit) paySubmit.disabled = false;
+      shrinkReceipt(String(fr.result || ""), out => {
+        payDataUrl = out;
+        if (payPrev) payPrev.setAttribute("src", payDataUrl);
+        if (payPrevWrap) payPrevWrap.hidden = false;
+        if (paySubmit) paySubmit.disabled = false;
+      });
     };
     fr.readAsDataURL(f);
   }

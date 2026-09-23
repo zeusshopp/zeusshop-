@@ -430,6 +430,18 @@ function placeOrder(o) {
       supa.from("orders").insert([payload], { onConflict: "id" })
         .then(r => { if (r.error) cb(r.error); }).catch(cb);
     };
+    /* final-attempt failure: the order exists ONLY in this browser, the admin
+       will never see it — say so loudly (RLS checkout_allowed also rejects when
+       the buyer already has 3 pending orders, and the panel can't guess that). */
+    const orderInsertFailed = err => {
+      dbLog(err);
+      try {
+        if (typeof showToast === "function") showToast(lang === "fa"
+          ? "⚠️ سفارش به دیتابیس نرسید و ادمین آن را نمی‌بیند! کد پیگیری را برای ادمین در تلگرام بفرست."
+          : "⚠️ Order did NOT reach the database — the admin cannot see it! Send your tracking code to the admin on Telegram.", true);
+      } catch { /* ignore */ }
+      dbNotify({ type: "orders" });
+    };
     if (row.coupon) {
       tryInsert({ ...payBase, coupon: row.coupon }, err => {
         /* coupon column may be missing: retry without it and track the code as a marker item
@@ -437,10 +449,10 @@ function placeOrder(o) {
            The first failure here is expected & retried — do NOT toast "server error" for it. */
         try { console.warn("ZEUSSHOP db: coupon insert retry:", err && err.message ? err.message : err); } catch { /* ignore */ }
         const items2 = [...(Array.isArray(row.items) ? row.items : []), { special: "coupon", code: String(row.coupon).toUpperCase() }];
-        tryInsert({ ...payBase, items: items2 }, dbLog);
+        tryInsert({ ...payBase, items: items2 }, orderInsertFailed);
       });
     } else {
-      tryInsert(payBase, dbLog);
+      tryInsert(payBase, orderInsertFailed);
     }
   });
   dbNotify({ type: "orders" });
@@ -756,6 +768,22 @@ async function dbInitHeavy() {
   if (!DB_MODE || !supa || dbHeavyStarted) return;
   dbHeavyStarted = true;
   try {
+    /* THE PANEL MUST READ ORDERS AS THE ADMIN. RLS hides every pending order from
+       an anonymous session ("orders public read approved"), so the very first
+       fetch used to come back with nothing to approve. Sign in first (resolves
+       fast when a Supabase session already exists), then start the fetches. */
+    if (IS_ADMIN_PAGE) {
+      const ensureP = dbEnsureSessionNow().catch(() => false);
+      const raced = await Promise.race([
+        ensureP,
+        new Promise(r => setTimeout(() => r(undefined), 6000)),
+      ]);
+      if (raced === true) {
+        dbRestartRealtime();          /* channel now knows we're the admin */
+      } else if (raced === undefined) {
+        ensureP.then(ok => { if (ok === true) dbRestartRealtime(); });
+      }
+    }
     /* notify each table the moment IT lands — the "latest purchases" ticker only
        needs orders, so it must not wait for slower tables (inventory/users) */
     const ordP = fetchRows("orders");
@@ -784,6 +812,9 @@ async function dbInitHeavy() {
 }
 
 const FETCH_TIMEOUT = 6000;
+/* heavy tables (orders carry base64 receipt photos → big payloads) get a longer
+   window: a timeout here means the admin list simply stays empty */
+const HEAVY_FETCH_TIMEOUT = 15000;
 
 /* ---------- change detection ----------
    cheap signatures protect pages from re-rendering (and images/requests
@@ -830,21 +861,37 @@ function dataChanged(table, rows, honorKey) {
   return true;
 }
 
+const ORDER_DESC_TABLES = { orders: "id", inventory: "id", users: "id" };
 function fetchRows(table) {
   return new Promise(resolve => {
     let done = false;
     const fin = (err, data) => { if (!done) { done = true; resolve([err, data || []]); } };
-    const timer = setTimeout(() => fin(new Error("timeout: " + table)), FETCH_TIMEOUT);
-    supa.from(table).select("*").limit(1000)
-      .then(r => { clearTimeout(timer); fin(r.error, r.data); })
+    const timer = setTimeout(() => fin(new Error("timeout: " + table)), ORDER_DESC_TABLES[table] ? HEAVY_FETCH_TIMEOUT : FETCH_TIMEOUT);
+    /* newest-first: with a full 1000-row window an unordered read can simply miss
+       the brand-new pending order the admin is waiting for */
+    let q = supa.from(table).select("*").limit(1000);
+    if (ORDER_DESC_TABLES[table]) {
+      try { q = q.order(ORDER_DESC_TABLES[table], { ascending: false }); } catch { /* ignore */ }
+    }
+    q.then(r => { clearTimeout(timer); fin(r.error, r.data); })
       .catch(e => { clearTimeout(timer); fin(e, null); });
   });
 }
 
 /* live updates: when anyone changes skins/orders, auto rebuild locals */
+let realtimeChannel = null;
+let realtimeSeq = 0;
+/* Realtime applies RLS too: a channel opened before the admin signs in only ever
+   receives events for publicly readable rows (approved orders). Rebuild it once
+   the admin session exists so pending INSERT/UPDATE events actually arrive. */
+function dbRestartRealtime() {
+  if (!supa) return;
+  if (realtimeChannel) { try { supa.removeChannel(realtimeChannel); } catch { /* ignore */ } realtimeChannel = null; }
+  dbRealtime();
+}
 function dbRealtime() {
   if (!supa) return;
-  const ch = supa.channel("zeus-live")
+  const ch = supa.channel("zeus-live-" + (++realtimeSeq))
     .on("postgres_changes", { event: "*", schema: "public", table: "skins" }, () => { realtimeSeen = true; reloadTable("skins"); })
     .on("postgres_changes", { event: "*", schema: "public", table: "announcement" }, () => { realtimeSeen = true; reloadTable("announcement"); })
     .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => { realtimeSeen = true; reloadTable("orders"); })
@@ -852,6 +899,7 @@ function dbRealtime() {
     .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => { realtimeSeen = true; reloadTable("users"); })
     .on("postgres_changes", { event: "*", schema: "public", table: "inventory" }, () => { realtimeSeen = true; reloadTable("inventory"); });
   try { ch.subscribe(); } catch { /* ignore */ }
+  realtimeChannel = ch;
 }
 function reloadTable(table) {
   if (!supa || !DB_READY) return;
@@ -908,10 +956,17 @@ function dbStartPolling() {
   };
   const heavy = () => {
     if (!supa || !DB_READY) return;
-    reloadTable("orders");
     reloadTable("inventory");
     /* the full users table is admin-only (RLS) — only fetch it in the panel */
     if (isAdmin) reloadTable("users");
+  };
+  /* orders get their own loop: in the panel they are polled FAST on purpose.
+     Realtime can't be trusted for pending rows (it applies RLS, and the channel
+     may predate the admin sign-in), so the admin must never wait 45s+ for a new
+     purchase to show up. On the shop page the normal adaptive cadence applies. */
+  const orders = () => {
+    if (!supa || !DB_READY) return;
+    reloadTable("orders");
   };
   const counts = () => {
     if (!supa || !DB_READY) return;
@@ -924,12 +979,15 @@ function dbStartPolling() {
   };
   const fastMs = () => hasRealtime() ? 60000 : (isAdmin ? 15000 : 20000);
   const heavyMs = () => hasRealtime() ? 45000 : (isAdmin ? 6000 : 12000);
+  const ordersMs = () => (isAdmin ? 4000 : (hasRealtime() ? 45000 : 12000));
   const countMs = () => hasRealtime() ? 90000 : 30000;
   const loop = (fn, ms) => { fn(); setTimeout(() => loop(fn, ms), ms()); };
   fast();
+  orders();
   heavy();
   counts();
   loop(fast, fastMs);
+  loop(orders, ordersMs);
   loop(heavy, heavyMs);
   loop(counts, countMs);
   dbPollTimer = true;
