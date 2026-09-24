@@ -941,6 +941,11 @@ table.adm tr:hover td { background: rgba(240, 194, 75, .03); }
 .user-row .user-info { flex: 1; min-width: 0; }
 .user-row .user-info b { display: block; font-size: .9rem; font-family: var(--font-en); letter-spacing: .3px; }
 .user-row .user-info span { font-size: .74rem; color: var(--muted); }
+/* username / gold stat → opens that user's inventory */
+.user-row .user-info[data-invtg] { cursor: pointer; }
+.user-row .user-info[data-invtg]:hover b { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.user-row .user-stat--gold[data-invtg] { cursor: pointer; }
+.user-row .user-stat--gold[data-invtg]:hover { box-shadow: 0 0 0 1px rgba(240, 194, 75, .55); }
 .user-stats { display: flex; gap: 8px; flex-wrap: wrap; }
 .user-stat {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
@@ -954,6 +959,27 @@ table.adm tr:hover td { background: rgba(240, 194, 75, .03); }
 .user-stat i { font-style: normal; font-size: .66rem; color: var(--muted); white-space: nowrap; }
 .user-stat--gold { border-color: rgba(240, 194, 75, .35); background: rgba(240, 194, 75, .08); }
 .user-stat--gold b { color: var(--accent); text-shadow: 0 0 12px rgba(240, 194, 75, .3); }
+
+/* ===== per-user inventory modal ===== */
+.modal__head .uinv-actions { display: flex; align-items: center; gap: 8px; }
+.uinv-body { max-height: min(62vh, 540px); overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.uinv-row {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: rgba(255, 255, 255, .02); padding: 8px 10px;
+}
+.uinv-row:hover { border-color: rgba(240, 194, 75, .3); }
+.uinv-row__img {
+  width: 42px; height: 42px; flex: 0 0 42px; border-radius: 9px;
+  display: grid; place-items: center; overflow: hidden;
+  background: rgba(240, 194, 75, .07); border: 1px solid rgba(240, 194, 75, .2);
+}
+.uinv-row__img img { width: 100%; height: 100%; object-fit: cover; }
+.uinv-row__img em { font-style: normal; font-weight: 800; color: var(--accent); }
+.uinv-row__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.uinv-row__info b { font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.uinv-row__info i { font-style: normal; font-size: .68rem; color: var(--muted); }
+.uinv-row__price { font-size: .8rem; color: var(--accent); font-weight: 700; white-space: nowrap; }
 
 /* ---------- MODAL (add skin) ---------- */
 .overlay {

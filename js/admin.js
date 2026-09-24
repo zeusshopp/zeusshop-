@@ -621,6 +621,10 @@ const tog = e.target.closest("[data-cp-toggle]");
       "Not saved (" + err + "). Re-login with your panel username + password and try again if needed."
     );
     if (a) {
+      /* double-click guard: the status flips synchronously below (DB mode) or
+         right after the sync work (local), so a second click while the first
+         is still awaiting must never insert the items a second time */
+      if (o.status === "approved") return;
       if (typeof isDbMode === "function" && isDbMode()) {
         o.status = "approved";
         let dbErr = await dbSaveOrderDirect(o);
@@ -631,7 +635,9 @@ const tog = e.target.closest("[data-cp-toggle]");
           return;
         }
       }
-      addToInventory(o.telegram, o.items || []);
+      /* DB mode: the awaited insert above already persisted the rows —
+         here we only mirror them locally, never INSERT a second time */
+      addToInventory(o.telegram, o.items || [], typeof isDbMode === "function" && isDbMode());
       o.status = "approved";
       if (o.coupon) {
         const cl = (typeof getCoupons === "function") ? getCoupons() : [];
@@ -707,7 +713,7 @@ const tog = e.target.closest("[data-cp-toggle]");
   const closeReceiptBtn = $id("closeReceipt");
   if (closeReceiptBtn) closeReceiptBtn.addEventListener("click", closeReceiptBox);
   if (receiptOverlay) receiptOverlay.addEventListener("click", closeReceiptBox);
-  document.addEventListener("keydown", e => { if (e.key === "Escape") closeReceiptBox(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeReceiptBox(); closeUserInv(); } });
 
   /* ---------- users ---------- */
   function renderUsers() {
@@ -734,13 +740,13 @@ const tog = e.target.closest("[data-cp-toggle]");
           ${av ? `<img src="${esc(av)}" alt="" loading="lazy" onerror="this.remove()">` : ""}
           <span>${initial}</span>
         </div>
-        <div class="user-info">
+        <div class="user-info" data-invtg="${id}" title="${FA("نمایش اینونتوری و حذف آیتم‌ها", "View inventory & remove items")}">
           <b>${id}</b>
           <span>${FA("عضویت", "Joined")} ${date || "—"}</span>
         </div>
         <div class="user-stats">
           <span class="user-stat"><b>${toFaDigits(bought)}</b><i>${FA("خرید تایید شده", "Purchases")}</i></span>
-          <span class="user-stat user-stat--gold"><b>${toFaDigits(invN)}</b><i>${FA("آیتم در اینونتوری", "Inventory items")}</i></span>
+          <span class="user-stat user-stat--gold" data-invtg="${id}" title="${FA("باز کردن اینونتوری", "Open inventory")}"><b>${toFaDigits(invN)}</b><i>${FA("آیتم در اینونتوری", "Inventory items")}</i></span>
         </div>
         <button class="btn btn--sm btn--danger" data-deluser="${id}" title="${FA("حذف کاربر", "Delete user")}">${FA("حذف", "Del")}</button>
       </div>`;
@@ -965,6 +971,9 @@ const tog = e.target.closest("[data-cp-toggle]");
 
   const usersList = $id("usersList");
   if (usersList) usersList.addEventListener("click", async e => {
+    /* click on the username (or the gold inventory stat) → open that user's inventory */
+    const inv = e.target.closest("[data-invtg]");
+    if (inv) { openUserInv(inv.getAttribute("data-invtg")); return; }
     const del = e.target.closest("[data-deluser]");
     if (!del) return;
     const tg = del.dataset.deluser;
@@ -973,6 +982,106 @@ const tog = e.target.closest("[data-cp-toggle]");
     if (err) { showToast(FA("حذف کاربر در دیتابیس انجام نشد: " + err, "Could not delete user: " + err), true); return; }
     renderAll();
     showToast(FA("کاربر حذف شد ✓", "User deleted ✓"));
+  });
+
+  /* ---------- per-user inventory viewer (click a username in Users) ---------- */
+  const uinvModal = $id("userInvModal");
+  const uinvOverlay = $id("uinvOverlay");
+  const uinvTitle = $id("uinvTitle");
+  const uinvBody = $id("uinvBody");
+  const uinvClean = $id("uinvClean");
+  let uinvTg = "";
+
+  /* exact double-insert artifacts of the old approve bug: the same
+     user+name+price written twice within 10s — real, separate purchases
+     are minutes (or days) apart, so they are never touched */
+  function dupInvRows(rows) {
+    const last = {}, kill = [];
+    (rows || []).slice().sort((a, b) =>
+      (new Date(a.created_at) - new Date(b.created_at)) || ((Number(a.id) || 0) - (Number(b.id) || 0))
+    ).forEach(r => {
+      const k = String(r.name || "") + "|" + (Number(r.price) || 0);
+      const t = new Date(r.created_at).getTime();
+      if (last[k] != null && t - last[k] <= 10000) kill.push(r);
+      else last[k] = t;
+    });
+    return kill;
+  }
+
+  function renderUserInv() {
+    if (!uinvBody) return;
+    const rows = getInventoryFor(uinvTg);
+    if (uinvTitle) uinvTitle.textContent = FA("اینونتوری ", "Inventory of ") + uinvTg + " · " + rows.length;
+    const dupN = dupInvRows(rows).length;
+    if (uinvClean) {
+      uinvClean.hidden = !dupN;
+      uinvClean.textContent = dupN
+        ? FA("پاک‌سازی " + toFaDigits(dupN) + " تکراری", "Remove " + dupN + " duplicate" + (dupN === 1 ? "" : "s"))
+        : "";
+    }
+    if (!rows.length) {
+      uinvBody.innerHTML = `<div class="empty"><p>${FA("اینونتوری این کاربر خالی است.", "This user's inventory is empty.")}</p></div>`;
+      return;
+    }
+    uinvBody.innerHTML = rows.map(r => {
+      const rc = (r.rarity && RARITY[r.rarity]) ? RARITY[r.rarity].color : "#f0c24b";
+      const meta = [r.weapon, r.wear].filter(Boolean).join(" · ");
+      return `
+      <div class="uinv-row" style="--c:${rc}">
+        <span class="uinv-row__img">${r.img ? `<img src="${esc(r.img)}" alt="" loading="lazy">` : `<em>${esc(String(r.weapon || "؟").charAt(0))}</em>`}</span>
+        <span class="uinv-row__info">
+          <b>${esc(r.name || "؟")}</b>
+          <i>${esc(meta || "—")}${meta ? " · " : ""}${fmtDate(r.created_at) || ""}</i>
+        </span>
+        <span class="uinv-row__price">${fmtPrice(Number(r.price) || 0)}</span>
+        <button type="button" class="btn btn--sm btn--danger" data-uinvdel="${Number(r.id) || 0}">${FA("حذف", "Del")}</button>
+      </div>`;
+    }).join("");
+  }
+
+  function openUserInv(tg) {
+    if (!uinvModal) return;
+    uinvTg = String(tg || "");
+    renderUserInv();
+    uinvModal.classList.add("is-on");
+    if (uinvOverlay) uinvOverlay.classList.add("is-on");
+  }
+  function closeUserInv() {
+    if (uinvModal) uinvModal.classList.remove("is-on");
+    if (uinvOverlay) uinvOverlay.classList.remove("is-on");
+    uinvTg = "";
+  }
+  const uinvCloseBtn = $id("uinvClose");
+  if (uinvCloseBtn) uinvCloseBtn.addEventListener("click", closeUserInv);
+  if (uinvOverlay) uinvOverlay.addEventListener("click", closeUserInv);
+
+  if (uinvBody) uinvBody.addEventListener("click", async e => {
+    const b = e.target.closest("[data-uinvdel]");
+    if (!b) return;
+    const rid = Number(b.getAttribute("data-uinvdel")) || 0;
+    const row = getInventoryFor(uinvTg).find(r => (Number(r.id) || 0) === rid);
+    if (!row) return;
+    if (!window.confirm(FA(`آیتم «${row.name}» از اینونتوری ${uinvTg} حذف شود؟`, `Remove "${row.name}" from ${uinvTg}'s inventory?`))) return;
+    const err = await dbDeleteInventoryItem(row);
+    if (err) { showToast(FA("حذف انجام نشد: " + err, "Delete failed: " + err), true); return; }
+    renderUserInv();
+    renderUsers();
+    showToast(FA("آیتم حذف شد ✓", "Item removed ✓"));
+  });
+
+  if (uinvClean) uinvClean.addEventListener("click", async () => {
+    const kill = dupInvRows(getInventoryFor(uinvTg));
+    if (!kill.length) return;
+    if (!window.confirm(FA(
+      `${toFaDigits(kill.length)} ردیف تکراری از اینونتوری ${uinvTg} پاک شود؟ خریدهای مجزا دست نمی‌خورند.`,
+      `Remove ${kill.length} duplicate inventory row(s) from ${uinvTg}? Separate purchases are kept.`))) return;
+    let fail = 0;
+    for (const r of kill) { const err = await dbDeleteInventoryItem(r); if (err) fail++; }
+    renderUserInv();
+    renderUsers();
+    showToast(fail
+      ? FA(`${toFaDigits(kill.length - fail)} پاک شد، ${toFaDigits(fail)} خطا`, `${kill.length - fail} removed, ${fail} failed`)
+      : FA("تکراری‌ها پاک شدند ✓", "Duplicates removed ✓"), !!fail);
   });
 
   /* ---------- settings: db status + announcement ---------- */

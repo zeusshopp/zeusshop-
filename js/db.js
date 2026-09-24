@@ -499,7 +499,10 @@ function deleteOrderItem(ordId, itemIdx) {
   });
   dbNotify({ type: "orders" });
 }
-function addToInventory(tg, items) {
+/* skipDb = the caller already inserted these rows into the DB (approve does an
+   awaited, verified insert). Without this flag the old flow inserted the same
+   items TWICE — buy 2 → inventory showed 4 (then 8, 20 … after re-approvals). */
+function addToInventory(tg, items, skipDb) {
   tg = String(tg || "").trim();
   if (!tg || !Array.isArray(items) || !items.length) return;
   const entries = items.filter(it => it && !it.special).map(it => ({
@@ -511,7 +514,7 @@ function addToInventory(tg, items) {
   }));
   invRowsCache = entries.concat(invRowsCache);
   lsSet(K_INV, invRowsCache);
-  if (DB_MODE) dbOnReady(function () {
+  if (DB_MODE && !skipDb) dbOnReady(function () {
     const mapped = entries.map(e => ({ telegram: tg, name: e.name, price: e.price, img: e.img, weapon: e.weapon, wear: e.wear, rarity: e.rarity, type: e.type, created_at: e.created_at }));
     supa.from("inventory").insert(mapped).then(r => { if (r.error) dbLog(r.error); }).catch(e => dbLog(e));
   });
@@ -608,12 +611,20 @@ function dbSyncCatalog(list, goneNames) {
   const gone = Array.isArray(goneNames) ? goneNames : [];
   deltaDb("skins", rows, gone);
 }
+/* Catalog writes are serialized: approving a 2-item order fires several syncs
+   back-to-back, and if their DELETE and full-list UPSERT chains interleave, a
+   stale upsert re-inserts a skin — the panel (reading catCache) looks correct
+   while the shop still shows the item for sale. One writer at a time, in order. */
+let dbDeltaChain = Promise.resolve();
 function deltaDb(table, rows, gone) {
   if (!supa) return;
-  const chain = (gone.length)
-    ? supa.from(table).delete().in("name", gone).then(r => { if (r.error) dbLog(r.error); return r; }).catch(dbLog)
-    : Promise.resolve();
-  if (rows.length) chain.then(() => dbUpsert(table, rows, "name"));
+  dbDeltaChain = dbDeltaChain.catch(() => {}).then(() => {
+    const chain = (gone.length)
+      ? supa.from(table).delete().in("name", gone).then(r => { if (r.error) dbLog(r.error); return r; }).catch(dbLog)
+      : Promise.resolve();
+    if (rows.length) return chain.then(() => dbUpsert(table, rows, "name"));
+    return chain;
+  }).catch(dbLog);
 }
 
 function dbSyncOrders(list) {
@@ -727,6 +738,38 @@ async function dbAddInventoryDirect(tg, items) {
     const { data, error } = await supa.from("inventory").insert(mapped).select("*");
     if (error) return error.message;
     if (!data || !Array.isArray(data) || data.length === 0) return "no-rows-affected";
+    return null;
+  } catch (e) { return e.message || "err"; }
+}
+
+/* delete ONE inventory row (admin's per-user viewer / duplicate cleanup).
+   .select("*") required: without it a successful DELETE returns no rows and
+   the panel would report a failure (same trap as the orders delete). */
+async function dbDeleteInventoryItem(row) {
+  row = row || {};
+  const rid = Number(row.id) || 0;
+  const tg = String(row.telegram || "");
+  const nm = String(row.name || "");
+  if (!rid && !tg) return "bad-row";
+  try {
+    if (DB_MODE && supa && DB_READY) {
+      if (!(await dbEnsureSessionNow())) return "not-signed-in";
+      let q = supa.from("inventory").delete();
+      if (rid) q = q.eq("id", rid);
+      else {
+        q = q.eq("telegram", tg).eq("name", nm);
+        if (row.created_at) q = q.eq("created_at", row.created_at);
+      }
+      const { data, error } = await q.select("*");
+      if (error) return error.message;
+      if (!data || !data.length) return "no-rows-affected";
+    }
+    const i = invRowsCache.findIndex(r => rid
+      ? Number(r.id || 0) === rid
+      : String(r.telegram || "") === tg && String(r.name || "") === nm);
+    if (i >= 0) invRowsCache.splice(i, 1);
+    lsSet(K_INV, invRowsCache);
+    dbNotify({ type: "inventory" });
     return null;
   } catch (e) { return e.message || "err"; }
 }
@@ -932,24 +975,34 @@ function dbRealtime() {
   try { ch.subscribe(); } catch { /* ignore */ }
   realtimeChannel = ch;
 }
+/* reads per table, serialized: a burst of realtime events fires overlapping
+   fetches and an OLDER response landing last would overwrite the cache with
+   stale rows (a bought skin reappears on the site / inventory counts jump
+   2 → 4 → 20). Chaining makes each snapshot start after the previous one
+   applied, so the cache only ever moves forward. */
+const reloadChains = {};
 function reloadTable(table) {
   if (!supa || !DB_READY) return;
-  fetchRows(table).then(([err, data]) => {
-    if (err) return;
-    const rows = data || [];
-    if (!dataChanged(table, rows)) return;
-    if (table === "skins") { catCache = rows.map(normSkin); lsSet(K_CAT, catCache); dbNotify({ type: "catalog" }); }
-    if (table === "announcement") { annCache = rows[0] ? normAnn(rows[0]) : normAnn(null); lsSet(K_ANN, annCache); dbNotify({ type: "announcement" }); }
-    if (table === "orders") { ordersCache = rows.map(normOrder); lsSet(K_ORD, ordersCache); dbNotify({ type: "orders" }); }
-    if (table === "users" && IS_ADMIN_PAGE) { usersCache = rows.map(normUser); userCountCache = usersCache.length; lsSet(K_USR, usersCache); dbNotify({ type: "users" }); }
-    if (table === "inventory") { invRowsCache = rows.map(normInv); lsSet(K_INV, invRowsCache); dbNotify({ type: "inventory" }); }
-    if (table === "site_settings") {
-      setCache = {};
-      rows.forEach(r => { if (r && r.key) setCache[r.key] = r.value; });
-      lsSet(K_SET, setCache);
-      dbNotify({ type: "settings" });
-    }
-  });
+  reloadChains[table] = (reloadChains[table] || Promise.resolve()).catch(() => {}).then(() => new Promise(resolve => {
+    fetchRows(table).then(([err, data]) => {
+      try {
+        if (err) return;
+        const rows = data || [];
+        if (!dataChanged(table, rows)) return;
+        if (table === "skins") { catCache = rows.map(normSkin); lsSet(K_CAT, catCache); dbNotify({ type: "catalog" }); }
+        if (table === "announcement") { annCache = rows[0] ? normAnn(rows[0]) : normAnn(null); lsSet(K_ANN, annCache); dbNotify({ type: "announcement" }); }
+        if (table === "orders") { ordersCache = rows.map(normOrder); lsSet(K_ORD, ordersCache); dbNotify({ type: "orders" }); }
+        if (table === "users" && IS_ADMIN_PAGE) { usersCache = rows.map(normUser); userCountCache = usersCache.length; lsSet(K_USR, usersCache); dbNotify({ type: "users" }); }
+        if (table === "inventory") { invRowsCache = rows.map(normInv); lsSet(K_INV, invRowsCache); dbNotify({ type: "inventory" }); }
+        if (table === "site_settings") {
+          setCache = {};
+          rows.forEach(r => { if (r && r.key) setCache[r.key] = r.value; });
+          lsSet(K_SET, setCache);
+          dbNotify({ type: "settings" });
+        }
+      } finally { resolve(); }
+    }, () => resolve());
+  }));
 }
 
 /* re-read site_settings (polling fallback for when Realtime is off) */
