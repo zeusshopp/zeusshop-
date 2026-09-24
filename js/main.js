@@ -1919,13 +1919,14 @@ if (profileModal) {
     const recent = uniq.slice(0, 12);
     let chips = "";
     let itemCount = 0;
-    const chipKeys = new Set();
     recent.forEach(o => {
       (Array.isArray(o.items) ? o.items : []).forEach(it => {
         if (!it || typeof it !== "object" || it.special) return;
-        const key = String(it.name || "");
-        if (chipKeys.has(key)) return;
-        chipKeys.add(key);
+        /* Every real item gets its own chip and its own +1 — NO name-dedup:
+           a second buyer of the same skin is still a purchase, and the header
+           count must match what the strip shows (a 2-item buy has to add 2,
+           not 1). Nameless junk rows (legacy receipts) are skipped. */
+        if (!String(it.name || "").trim()) return;
         chips += tickerChip(it, o);
         itemCount++;
       });
