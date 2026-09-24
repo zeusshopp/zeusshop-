@@ -992,6 +992,14 @@ const tog = e.target.closest("[data-cp-toggle]");
   const uinvClean = $id("uinvClean");
   let uinvTg = "";
 
+  /* deployment check on panel load: this JS is newer than the HTML it runs on
+     when the modal is absent — say it out loud instead of failing silently */
+  if (usersList && !$id("userInvModal")) {
+    setTimeout(() => showToast(FA(
+      "admin.html قدیمی است: مودال اینونتوری در این صفحه نیست — admin.html را آپلود و Ctrl+F5 کنید.",
+      "admin.html is outdated: the inventory modal is missing — upload admin.html and hard-refresh."), true), 1200);
+  }
+
   /* exact double-insert artifacts of the old approve bug: the same
      user+name+price written twice within 10s — real, separate purchases
      are minutes (or days) apart, so they are never touched */
@@ -1040,9 +1048,23 @@ const tog = e.target.closest("[data-cp-toggle]");
   }
 
   function openUserInv(tg) {
-    if (!uinvModal) return;
+    /* every failure path is VISIBLE (toast) — a silent no-op here is
+       indistinguishable from "the file was never uploaded" */
+    if (!uinvModal || !uinvBody) {
+      showToast(FA(
+        "مودال اینونتوری پیدا نشد — admin.html جدید آپلود نشده (admin.html را آپلود و Ctrl+F5 کنید).",
+        "Inventory modal missing — upload the new admin.html and hard-refresh."), true);
+      return;
+    }
     uinvTg = String(tg || "");
-    renderUserInv();
+    try {
+      renderUserInv();
+    } catch (err) {
+      showToast(FA(
+        "خطا در نمایش اینونتوری: " + ((err && err.message) || err),
+        "Inventory render error: " + ((err && err.message) || err)), true);
+      return;
+    }
     uinvModal.classList.add("is-on");
     if (uinvOverlay) uinvOverlay.classList.add("is-on");
   }

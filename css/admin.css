@@ -962,6 +962,8 @@ table.adm tr:hover td { background: rgba(240, 194, 75, .03); }
 
 /* ===== per-user inventory modal ===== */
 .modal__head .uinv-actions { display: flex; align-items: center; gap: 8px; }
+/* .btn sets display:inline-flex, which beats the UA [hidden] rule — hide explicitly */
+.uinv-actions .btn[hidden] { display: none; }
 .uinv-body { max-height: min(62vh, 540px); overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 .uinv-row {
   display: flex; align-items: center; gap: 10px;
