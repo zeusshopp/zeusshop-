@@ -912,7 +912,7 @@ function rowsSig(rows, table) {
   for (const r of arr) {
     if (table === "skins") {
       const i = String(r && r.img || "");
-      h = (h * 31 + hashStr((r && r.name || "") + "|" + (r && r.price || 0) + "|" + (r && r.discount || 0) + "|" + (r && r.sort || 0) + "|" + (r && r.delivery_mode || "") + "|" + (r && r.delivery_days || 0) + "|" + i.length + "|" + i.slice(0, 20) + "|" + i.slice(-20))) >>> 0;
+      h = (h * 31 + hashStr((r && r.name || "") + "|" + (r && r.price || 0) + "|" + (r && r.discount || 0) + "|" + (r && r.sort || 0) + "|" + (r && r.delivery_mode || "") + "|" + (r && r.delivery_days || 0) + "|" + (r && r.type || "") + "|" + (r && r.weapon || "") + "|" + (r && r.wear || "") + "|" + (r && r.rarity || "") + "|" + i.length + "|" + i.slice(0, 20) + "|" + i.slice(-20))) >>> 0;
     } else if (table === "orders") {
       const its = Array.isArray(r && r.items) ? r.items : [];
       h = (h * 31 + hashStr((r && r.id || 0) + "|" + (r && r.status || "") + "|" + (r && r.telegram || "") + "|" + (r && r.total || 0) + "|" + (r && r.date || "") + "|" + its.length + "|" + its.map(it => (it && it.name || "") + ":" + (it && it.price || 0)).join(","))) >>> 0;

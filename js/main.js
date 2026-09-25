@@ -28,6 +28,7 @@ window.addEventListener("hashchange", adminFromHash);
 const I18N = {
   fa: {
     navMarket: "مارکت", navProfile: "پروفایل",
+    navTf2: "کلید TF2",
     heroBadge: "مارکت زنده",
     heroTitle: 'خرید و فروش <span class="hero__accent">اسکین CS2</span><br/>در چند ثانیه',
     heroSub: "تحویل آنی روی تلگرام، با کمترین کارمزد.",
@@ -44,6 +45,9 @@ const I18N = {
     priceTo: "تا سقف",
     count: "{n} آیتم",
     emptyTitle: "اسکینی با این فیلترها پیدا نشد.", emptyReset: "ریست فیلترها",
+    tf2Title: "کلیدهای TF2",
+    tf2Sub: "خرید کلید TF2 با تحویل فوری روی تلگرام.",
+    tf2Empty: "فعلاً کلید TF2 برای فروش نیست.",
     trust1: "تحویل فوری", trust2: "معامله ۱۰۰٪ امن", trust3: "کارمزد صفر خرید", trust4: "تحویل ~۱۰ ثانیه‌ای",
     footerDesc: "بهترین مارکت‌پلیس اسکین CS2. ساخته‌شده برای گیمرها، توسط گیمرها.",
     footerNoteTitle: "چرا <span dir=&quot;ltr&quot;>ZEUSSHOP</span>",
@@ -122,6 +126,7 @@ const I18N = {
   },
   en: {
     navMarket: "Market", navProfile: "Profile",
+    navTf2: "TF2 Key",
     heroBadge: "LIVE MARKET",
     heroTitle: 'Buy &amp; Sell <span class="hero__accent">CS2 Skins</span><br/>in Seconds',
     heroSub: "Instant delivery via Telegram. Lowest fees.",
@@ -138,6 +143,9 @@ const I18N = {
     priceTo: "Up to",
     count: "{n} items",
     emptyTitle: "No skins match your filters.", emptyReset: "Reset filters",
+    tf2Title: "TF2 Keys",
+    tf2Sub: "Buy TF2 keys with instant delivery on Telegram.",
+    tf2Empty: "No TF2 keys on sale right now.",
     trust1: "Instant Delivery", trust2: "100% Secure Trades", trust3: "0% Buyer Fees", trust4: "~10 sec Delivery",
     footerDesc: "The ultimate CS2 skins marketplace. Built for players, by players.",
     footerNoteTitle: "Why <span dir=&quot;ltr&quot;>ZEUSSHOP</span>",
@@ -315,8 +323,12 @@ const priceInner = s => {
     : now;
 };
 
+/* --- کلید TF2: ردیف‌های کاتالوگ با type === "TF2" (جدا از اسکین‌ها) --- */
+const isTf2 = s => String((s && s.type) || "") === "TF2";
+const getTf2List = () => getSkins().filter(isTf2);
+
 function refreshHero() {
-  const count = getSkins().length;
+  const count = getSkins().filter(s => !isTf2(s)).length;
   const badge = document.querySelector("[data-i18n='heroBadge']");
   if (badge) badge.textContent = lang === "fa"
     ? `مارکت زنده · ${toFaDigits(count)} اسکین در فروش`
@@ -331,7 +343,7 @@ function refreshHero() {
   }
   const volEl = $id("statVolume");
   if (volEl) {
-    const listed = (getSkins() || []).reduce((s, k) => {
+    const listed = (getSkins() || []).filter(s => !isTf2(s)).reduce((s, k) => {
       const d = Math.max(0, Math.min(100, Number(k.discount) || 0));
       const p = d > 0 ? Number(k.price) * (1 - d / 100) : Number(k.price);
       return s + (Number(p) || 0);
@@ -826,7 +838,7 @@ if (profileModal) {
   function globalState() {
     if (!grid) return;
     if (priceVal) priceVal.textContent = fmtPrice(maxPrice);
-    let list = getSkins();
+    let list = getSkins().filter(s => !isTf2(s));
     if (activeWeapon.size) list = list.filter(s => activeWeapon.has(s.weapon));
     if (activeWear.size) list = list.filter(s => activeWear.has(s.wear));
     if (activeType.size) list = list.filter(s => activeType.has(s.type));
@@ -835,6 +847,7 @@ if (profileModal) {
     if (q) list = list.filter(s => s.name.toLowerCase().includes(q));
     list = applySort(list);
     render(list);
+    if (typeof renderTf2 === "function") renderTf2();
     refreshHero();
   }
 
@@ -920,6 +933,12 @@ if (profileModal) {
   }
 
   function syncCards() {
+    const tf2Grid = $id("tf2Grid");
+    if (tf2Grid) {
+      Array.prototype.forEach.call(tf2Grid.children, card => {
+        card.classList.toggle("is-in-cart", cart.includes(card.dataset.name || ""));
+      });
+    }
     if (!grid) return;
     Array.prototype.forEach.call(grid.children, card => {
       const name = card.dataset.name || "";
@@ -948,7 +967,7 @@ if (profileModal) {
           <div class="cart-item__img"><img src="${encImg(s.img)}" alt="${s.name}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><circle cx=%2211%22 cy=%2211%22 r=%227%22 fill=%22%232b261a%22/><path d=%22m20 20-3.2-3.2%22 stroke=%22%23f0c24b%22/></svg>'"/></div>
           <div class="cart-item__info">
             <div class="cart-item__name">${s.name}</div>
-            <div class="cart-item__meta"><b>${s.wear}</b> · ${s.weapon}</div>
+            ${isTf2(s) ? "" : `<div class="cart-item__meta"><b>${s.wear}</b> · ${s.weapon}</div>`}
           </div>
           <span class="cart-item__price">${priceInner(s)}</span>
           <button class="cart-item__remove" data-remove="${name}" aria-label="×">×</button>
@@ -1061,6 +1080,78 @@ if (profileModal) {
     const skin = findSkin(name);
     if (!skin) return;
     openSkinModal(skin);
+  });
+
+  /* =========================================================
+     کلیدهای TF2 — بخش جداگانه‌ی سایت (type === "TF2")
+     ========================================================= */
+  function renderTf2() {
+    const g = $id("tf2Grid");
+    if (!g) return;
+    const empty = $id("tf2Empty");
+    const list = applySort(getTf2List());
+    if (empty) empty.hidden = list.length !== 0;
+    g.innerHTML = list.map((s, idx) => `
+      <article class="card skin-card tf2-card card--enter" style="animation-delay:${Math.min(idx, 11) * 60}ms" data-name="${s.name}" data-price="${s.price}">
+        <span class="card__incart" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M2.5 3h2.2l2.3 12.2a1.6 1.6 0 0 0 1.6 1.3h8.6a1.6 1.6 0 0 0 1.6-1.3L21 7H6"/></svg>
+          <i>${lang === "fa" ? "در سبد" : "In cart"}</i>
+        </span>
+        <div class="card__img">
+          <span class="card__glow" aria-hidden="true"></span>
+          <img src="${encImg(s.img)}" alt="${s.name}" loading="lazy" onerror="this.closest('.card__img').classList.add('is-missing')" />
+        </div>
+        <div class="card__body">
+          <div class="card__name" title="${s.name}">${s.name}</div>
+          <div class="card__bottom">
+            <span class="card__price">${priceInner(s)}</span>
+          </div>
+        </div>
+      </article>`).join("");
+    syncCards();
+  }
+
+  const tf2GridEl = $id("tf2Grid");
+  if (tf2GridEl) tf2GridEl.addEventListener("click", e => {
+    const card = e.target.closest(".skin-card");
+    if (!card) return;
+    const name = card.dataset.name || "";
+    const item = findSkin(name);
+    if (!item) return;
+    if (cart.includes(name)) { showToast(t("tInCart", { name })); openCart(); return; }
+    requireTelegram(() => {
+      cart.push(name);
+      saveCart();
+      renderCart();
+      showToast(t("tAdded", { name }));
+      openCart();
+    });
+  });
+
+  /* نمای TF2 — مانند اینونتوری: تعویض کامل نما (صفحه‌ی جدا از مارکت) */
+  function showTf2(open) {
+    document.body.classList.toggle("is-tf2", open);
+    if (open) {
+      document.body.classList.remove("is-inv");
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      renderTf2();
+    }
+  }
+  const tf2Nav = $id("tf2Nav");
+  if (tf2Nav) tf2Nav.addEventListener("click", e => {
+    e.preventDefault();
+    showTf2(!document.body.classList.contains("is-tf2"));
+  });
+  const tf2Back = $id("tf2Back");
+  if (tf2Back) tf2Back.addEventListener("click", () => showTf2(false));
+  const marketNav = $id("marketNav");
+  if (marketNav) marketNav.addEventListener("click", e => {
+    e.preventDefault();
+    showTf2(false);
+    document.body.classList.remove("is-inv");
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
   });
 
   cartBody.addEventListener("click", e => {
@@ -1563,7 +1654,9 @@ if (profileModal) {
       invEmpty.hidden = list.length !== 0;
       invGrid.innerHTML = list.map(it => {
         const r = RARITY[it.rarity] ? RARITY[it.rarity].color : "#f0c24b";
-        const metaPts = [it.weapon, it.wear, it.type && it.type !== "Normal" ? it.type : null].filter(Boolean);
+        const metaPts = it.type === "TF2"
+          ? ["TF2"]
+          : [it.weapon, it.wear, it.type && it.type !== "Normal" ? it.type : null].filter(Boolean);
         const date = (it.created_at || it.date) ? new Date((it.created_at || it.date)).toLocaleDateString(lang === "fa" ? "fa-IR" : "en-GB") : "";
         return `
         <article class="card card--inv" style="--rarity:${r}">
@@ -1584,7 +1677,7 @@ if (profileModal) {
     }
     function showInv(open) {
       document.body.classList.toggle("is-inv", open);
-      if (open) { window.scrollTo(0, 0); document.documentElement.scrollTop = 0; renderUserInventory(); }
+      if (open) { document.body.classList.remove("is-tf2"); window.scrollTo(0, 0); document.documentElement.scrollTop = 0; renderUserInventory(); }
     }
     invNav.addEventListener("click", e => { e.preventDefault(); showInv(!document.body.classList.contains("is-inv")); });
     if (invBack) invBack.addEventListener("click", () => showInv(false));

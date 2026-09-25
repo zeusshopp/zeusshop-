@@ -6,8 +6,8 @@
   <title>پنل مدیریت | ZEUSSHOP</title>
   <link rel="icon" type="image/png" href="image/fav.png" />
   <link rel="stylesheet" href="css/fonts.css?v=87" />
-  <link rel="stylesheet" href="css/style.css?v=109" />
-  <link rel="stylesheet" href="css/admin.css?v=94" />
+  <link rel="stylesheet" href="css/style.css?v=112" />
+  <link rel="stylesheet" href="css/admin.css?v=95" />
 </head>
 <body class="admin">
   <aside class="admin__side" id="sideBar">
@@ -29,6 +29,10 @@
       <a href="#inventory">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>
         <span data-i18n="admInventory">موجودی</span>
+      </a>
+      <a href="#tf2keys">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="15" r="4.2"/><path d="M11 12 21 2M17.4 5.6l2.2 2.2M14.7 8.3l2.2 2.2"/></svg>
+        <span>کلیدهای TF2</span>
       </a>
       <a href="#orders">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6h15l-1.5 9H6L4 3H2"/><circle cx="9" cy="20" r="1.7"/><circle cx="17" cy="20" r="1.7"/></svg>
@@ -149,6 +153,31 @@
         <div class="empty" id="admEmpty" hidden>
           <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2M8 11h6"/></svg>
           <p data-i18n="admEmptyTitle">اسکینی ثبت نشده است.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TF2 KEYS (کلیدهای TF2 — جدا از اسکین‌ها) ===== -->
+    <section class="panel-card is-hidden" id="tf2keys">
+      <div class="panel-card__head">
+        <h2>🔑 کلیدهای TF2</h2>
+        <div class="inv-tools">
+          <div class="adm-search">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+            <input type="text" id="tf2Search" placeholder="جستجوی کلید..." />
+          </div>
+          <span class="inv-count" id="tf2Count">0</span>
+          <button class="btn btn--primary btn--sm" id="addTf2Btn">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+            <span>افزودن کلید</span>
+          </button>
+        </div>
+      </div>
+      <div class="panel-card__body">
+        <div class="inventory" id="tf2Grid"></div>
+        <div class="empty" id="tf2Empty" hidden>
+          <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="15" r="4.2"/><path d="M11 12 21 2M17.4 5.6l2.2 2.2M14.7 8.3l2.2 2.2"/></svg>
+          <p>کلیدی ثبت نشده است.</p>
         </div>
       </div>
     </section>
@@ -563,6 +592,60 @@
     </form>
   </div>
 
+  <!-- ===== ADD TF2 KEY MODAL (فقط تصویر + قیمت + تخفیف) ===== -->
+  <div class="overlay" id="tf2Overlay"></div>
+  <div class="modal" id="tf2Modal" role="dialog" aria-modal="true" aria-label="افزودن کلید TF2">
+    <form class="modal__box" id="tf2Form" novalidate>
+      <div class="modal__head">
+        <h3>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="15" r="4.2"/><path d="M11 12 21 2M17.4 5.6l2.2 2.2M14.7 8.3l2.2 2.2"/></svg>
+          <span id="tf2ModalTitle">افزودن کلید TF2 جدید</span>
+        </h3>
+        <button type="button" class="icon-btn" id="closeTf2Modal" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <div class="form-grid">
+          <div class="field field--full">
+            <label class="field__label">نام کلید</label>
+            <input class="field__input" id="tfName" required placeholder="کلید TF2" />
+          </div>
+          <div class="field">
+            <label class="field__label">قیمت (تومان)</label>
+            <input class="field__input" id="tfPrice" type="number" min="1" step=".01" required dir="ltr" placeholder="5200.00" />
+          </div>
+          <div class="field">
+            <label class="field__label">تخفیف</label>
+            <div class="disc-input">
+              <label class="switch switch--xs"><input type="checkbox" id="tfDisOn" /><i></i></label>
+              <input class="field__input" id="tfDiscount" type="number" min="0" max="99" step="1" dir="ltr" placeholder="٪" />
+            </div>
+            <p class="disc-preview" id="tfDiscPreview" hidden></p>
+            <p class="field__hint">روشن کردن تخفیف، قیمت قدیم (خط‌خورده) و قیمت نمایشی را با هم روی کارت نشان می‌دهد.</p>
+          </div>
+          <div class="field field--full">
+            <label class="field__label">تصویر کلید</label>
+            <label class="img-picker" for="tfImg">
+              <input type="file" id="tfImg" accept="image/*" hidden />
+              <img class="img-picker__prev" id="tfImgPrev" alt="" hidden />
+              <span class="img-picker__empty" id="tfImgEmpty">
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"/></svg>
+                <b>انتخاب تصویر</b>
+                <small>PNG / JPG / WebP — روی این کادر بزنید</small>
+              </span>
+            </label>
+            <p class="field__hint">در صورت خالی ماندن، تصویر پیش‌فرض قرار می‌گیرد.</p>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn--ghost" id="cancelTf2">انصراف</button>
+          <button type="submit" class="btn btn--primary">ثبت کلید</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
   <!-- ===== RECEIPT LIGHTBOX (فیش پرداخت) ===== -->
   <div class="overlay" id="receiptOverlay"></div>
   <div class="modal" id="receiptModal" role="dialog" aria-modal="true" aria-label="فیش پرداخت">
@@ -601,8 +684,8 @@
 
   <script src="js/supabase.min.js?v=1"></script>
   <script src="js/supabase-config.js?v=87"></script>
-  <script src="js/db.js?v=110"></script>
-  <script src="js/main.js?v=126"></script>
-  <script src="js/admin.js?v=110"></script>
+  <script src="js/db.js?v=111"></script>
+  <script src="js/main.js?v=128"></script>
+  <script src="js/admin.js?v=111"></script>
 </body>
 </html>

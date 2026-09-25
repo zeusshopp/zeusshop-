@@ -156,7 +156,7 @@ if (adminMain) {
 
   /* ---------- stats ---------- */
   function renderStats() {
-    $id("statSkins").textContent = toFaDigits(getSkins().length);
+    $id("statSkins").textContent = toFaDigits(getSkins().filter(s => !isTf2(s)).length);
     $id("statOrders").textContent = toFaDigits(getOrders().filter(o => o.status === "pending").length);
     $id("statUsers").textContent = toFaDigits(getUsers().length);
   }
@@ -168,7 +168,7 @@ if (adminMain) {
     const empty = $id("admEmpty");
     const count = $id("invCount");
     const q = invQuery.trim().toLowerCase();
-    const list = getSkins().filter(s => !q || s.name.toLowerCase().includes(q));
+    const list = getSkins().filter(s => !isTf2(s)).filter(s => !q || s.name.toLowerCase().includes(q));
     empty.hidden = list.length !== 0;
     if (count) count.textContent = list.length;
     grid.innerHTML = list.map((s, idx) => {
@@ -206,6 +206,208 @@ if (adminMain) {
       invTimer = setTimeout(renderInventory, 140);
     });
   }
+
+  /* ---------- TF2 keys («کلیدهای TF2») — محصولات جدا از اسکین‌ها ---------- */
+  let tf2Query = "";
+  function renderTf2() {
+    const grid = $id("tf2Grid");
+    if (!grid) return;
+    const empty = $id("tf2Empty");
+    const count = $id("tf2Count");
+    const q = tf2Query.trim().toLowerCase();
+    const list = getTf2List().filter(s => !q || s.name.toLowerCase().includes(q));
+    if (empty) empty.hidden = list.length !== 0;
+    if (count) count.textContent = list.length;
+    grid.innerHTML = list.map((s, idx) => {
+      const d = skinDiscount(s);
+      const isOff = d > 0;
+      return `
+      <article class="card skin-card card--enter${isOff ? " is-off" : ""}" style="--rarity:#f0c24b;animation-delay:${Math.min(idx, 11) * 40}ms" data-name="${s.name}">
+        <div class="card__img">
+          <span class="card__glow" aria-hidden="true"></span>
+          <img src="${encImg(s.img)}" alt="${s.name}" loading="lazy" onerror="this.closest('.card__img').classList.add('is-missing')" />
+        </div>
+        <div class="card__body">
+          <div class="card__name" title="${s.name}">${s.name}</div>
+          <div class="card__bottom">
+            <span class="card__price">${priceInner(s)}</span>
+          </div>
+        </div>
+        <div class="skin__actions">
+          <button class="btn btn--sm btn--disc" data-tf2disc="${s.name}" title="${FA("تنظیم تخفیف", "Set discount")}">${FA("تخفیف", "Disc")}${isOff ? " " + d + "%" : ""}</button>
+          <button class="btn btn--sm btn--ghost" data-tf2edit="${s.name}">${FA("ویرایش", "Edit")}</button>
+          <button class="btn btn--sm btn--danger" data-tf2del="${s.name}">${FA("حذف", "Delete")}</button>
+        </div>
+      </article>`;
+    }).join("");
+  }
+
+  const tf2Search = $id("tf2Search");
+  if (tf2Search) {
+    let tf2Timer = 0;
+    tf2Search.addEventListener("input", e => {
+      tf2Query = e.target.value;
+      clearTimeout(tf2Timer);
+      tf2Timer = setTimeout(renderTf2, 140);
+    });
+  }
+
+  function deleteTf2(name) {
+    const ok = window.confirm(FA(`کلید «${name}» حذف شود؟`, `Delete key "${name}"?`));
+    if (!ok) return;
+    let custom = getCustom();
+    let deleted = getDel();
+    if (custom.some(s => s.name === name)) {
+      custom = custom.filter(s => s.name !== name);
+    } else {
+      deleted.push(name);
+    }
+    saveCustom(custom);
+    saveDel(deleted);
+    renderAll();
+    showToast(FA("کلید حذف شد ✓", "Key deleted ✓"));
+  }
+
+  /* ---------- add / edit TF2 key modal (فقط تصویر + قیمت + تخفیف) ---------- */
+  const tf2Modal = $id("tf2Modal");
+  const tf2Overlay = $id("tf2Overlay");
+  const tf2Form = $id("tf2Form");
+  const tfName = $id("tfName"), tfPrice = $id("tfPrice"),
+        tfDisOn = $id("tfDisOn"), tfDiscount = $id("tfDiscount"), tfImg = $id("tfImg");
+  let tf2Editing = null;
+  let tf2ImgData = null;
+
+  function tf2DiscPreview() {
+    const pre = $id("tfDiscPreview");
+    if (!pre) return;
+    const price = parseFloat(tfPrice.value);
+    const on = tfDisOn.checked;
+    const pct = Math.max(0, Math.min(99, parseInt(tfDiscount.value, 10) || 0));
+    if (!on || isNaN(price) || price <= 0) { pre.hidden = true; return; }
+    const fin = price * (1 - pct / 100);
+    pre.hidden = false;
+    pre.innerHTML = FA(
+      `قیمت قدیم: <s class="price-old">${fmtNum(price)}</s> &rarr; قیمت نمایشی: <b class="price-now">${fmtNum(fin)} ${unitTxt()}</b>`,
+      `Old: <s class="price-old">${fmtNum(price)}</s> &rarr; Display: <b class="price-now">${fmtNum(fin)} ${unitTxt()}</b>`
+    );
+  }
+  tfPrice.addEventListener("input", tf2DiscPreview);
+  tfDiscount.addEventListener("input", tf2DiscPreview);
+  tfDisOn.addEventListener("change", tf2DiscPreview);
+
+  function openTf2Modal(name, focusDisc) {
+    tf2Editing = name || null;
+    tf2ImgData = null;
+    tf2Form.reset();
+    tfImg.value = "";
+    tfDisOn.checked = false;
+    tfDiscount.value = "";
+    const prev = $id("tfImgPrev");
+    const empty = $id("tfImgEmpty");
+    if (prev) { prev.hidden = true; prev.removeAttribute("src"); }
+    if (empty) empty.hidden = false;
+    const title = $id("tf2ModalTitle");
+    if (title) title.textContent = name
+      ? FA(`ویرایش کلید — ${name}`, `Edit key — ${name}`)
+      : FA("افزودن کلید TF2 جدید", "Add new TF2 key");
+    tfName.value = name || FA("کلید TF2", "TF2 Key");
+    if (name) {
+      const s = findSkin(name);
+      if (s) {
+        tfPrice.value = s.price;
+        const d = skinDiscount(s);
+        tfDisOn.checked = d > 0;
+        tfDiscount.value = d > 0 ? d : "";
+        if (s.img && prev) { prev.src = encImg(s.img); prev.hidden = false; if (empty) empty.hidden = true; }
+      }
+    }
+    if (focusDisc) {
+      tfDisOn.checked = true;
+      if (!tfDiscount.value) tfDiscount.value = "25";
+      tf2DiscPreview();
+      setTimeout(() => { tfDiscount.focus(); tfDiscount.select(); }, 250);
+    } else {
+      tf2DiscPreview();
+    }
+    tf2Modal.classList.add("is-on");
+    tf2Overlay.classList.add("is-on");
+  }
+  function closeTf2Modal() {
+    tf2Modal.classList.remove("is-on");
+    tf2Overlay.classList.remove("is-on");
+    tf2Editing = null;
+    tf2ImgData = null;
+  }
+
+  const addTf2Btn = $id("addTf2Btn");
+  if (addTf2Btn) addTf2Btn.addEventListener("click", () => openTf2Modal(null));
+  $id("closeTf2Modal").addEventListener("click", closeTf2Modal);
+  $id("cancelTf2").addEventListener("click", closeTf2Modal);
+  tf2Overlay.addEventListener("click", closeTf2Modal);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeTf2Modal(); });
+
+  tfImg.addEventListener("change", e => {
+    const file = e.target.files && e.target.files[0];
+    const prev = $id("tfImgPrev");
+    const empty = $id("tfImgEmpty");
+    if (!file) { if (prev) prev.hidden = true; if (empty) empty.hidden = false; return; }
+    const rd = new FileReader();
+    rd.onload = () => {
+      tf2ImgData = rd.result;
+      if (prev) { prev.src = tf2ImgData; prev.hidden = false; }
+      if (empty) empty.hidden = true;
+    };
+    rd.readAsDataURL(file);
+  });
+
+  tf2Form.addEventListener("submit", e => {
+    e.preventDefault();
+    const name = tfName.value.trim();
+    if (!name) { showToast(FA("نام کلید را وارد کنید", "Enter a key name"), true); tfName.focus(); return; }
+    const price = parseFloat(tfPrice.value);
+    if (isNaN(price) || price <= 0) { showToast(FA("قیمت معتبر وارد کنید", "Enter a valid price"), true); tfPrice.focus(); return; }
+
+    const discOn = tfDisOn.checked;
+    const discVal = parseInt(tfDiscount.value, 10);
+    const discount = discOn ? Math.max(0, Math.min(99, isNaN(discVal) ? 25 : discVal)) : 0;
+
+    const obj = {
+      name: name,
+      img: tf2ImgData || (tf2Editing ? (findSkin(tf2Editing) || {}).img : ""),
+      weapon: "TF2",
+      wear: "—",
+      rarity: "Extraordinary",
+      type: "TF2",
+      price: price,
+      discount: discount,
+      delivery_mode: "immediate",
+      delivery_days: 0,
+    };
+
+    let custom = getCustom();
+    let deleted = getDel();
+    if (tf2Editing) {
+      custom = custom.filter(s => s.name !== tf2Editing);
+      if (!(typeof isDbMode === "function" && isDbMode()) && SKINS.some(s => s.name === tf2Editing)) deleted.push(tf2Editing);
+    }
+    custom.push(obj);
+    if (!(typeof isDbMode === "function" && isDbMode()) && SKINS.some(s => s.name === name)) deleted.push(name);
+    saveCustom(custom);
+    saveDel([...new Set(deleted)]);
+    closeTf2Modal();
+    renderAll();
+    showToast(discount > 0 ? FA(`کلید ثبت شد ✓ (${discount}٪ تخفیف)`, `Key saved (${discount}% off) ✓`) : FA("کلید ثبت شد ✓", "Key saved ✓"));
+  });
+
+  const tf2Grid = $id("tf2Grid");
+  if (tf2Grid) tf2Grid.addEventListener("click", e => {
+    const disc = e.target.closest("[data-tf2disc]");
+    if (disc) { openTf2Modal(disc.getAttribute("data-tf2disc"), "disc"); return; }
+    const edit = e.target.closest("[data-tf2edit]");
+    if (edit) { openTf2Modal(edit.getAttribute("data-tf2edit")); return; }
+    const del = e.target.closest("[data-tf2del]");
+    if (del) { deleteTf2(del.getAttribute("data-tf2del")); return; }
+  });
 
   /* ---------- orders — approve / reject → user inventory ---------- */
   let ordQ = "";
@@ -753,7 +955,7 @@ const tog = e.target.closest("[data-cp-toggle]");
     }).join("");
   }
 
-  function renderAll() { renderStats(); renderInventory(); renderOrders(); renderApproved(); renderUsers(); renderCoupons(); }
+  function renderAll() { renderStats(); renderInventory(); renderTf2(); renderOrders(); renderApproved(); renderUsers(); renderCoupons(); }
 
   /* ---------- add / edit skin modal ---------- */
   const skinModal = $id("skinModal");

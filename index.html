@@ -7,8 +7,8 @@
   <title>ZEUSSHOP — خرید و فروش اسکین CS2</title>
   <link rel="icon" type="image/png" href="image/fav.png" />
   <link rel="stylesheet" href="css/fonts.css?v=87" />
-  <link rel="stylesheet" href="css/style.css?v=109" />
-  <link rel="stylesheet" href="css/admin.css?v=89" />
+  <link rel="stylesheet" href="css/style.css?v=112" />
+  <link rel="stylesheet" href="css/admin.css?v=95" />
 </head>
 <body>
 
@@ -25,9 +25,19 @@
       <div class="header__actions">
         <button class="lang-btn" id="langToggle" aria-label="Switch language">EN</button>
 
+        <button class="inv-btn market-btn" id="marketNav" aria-label="Market">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>
+          <span data-i18n="navMarket">مارکت</span>
+        </button>
+
         <button class="inv-btn raffle-btn" id="raffleNav" aria-label="Raffle">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3.4M12 17.6V21M3 12h3.4M17.6 12H21M5.6 5.6l2.4 2.4M16 16l2.4 2.4M18.4 5.6 16 8M8 16l-2.4 2.4"/></svg>
           <span data-i18n="navRaffle">قرعه‌کشی</span>
+        </button>
+
+        <button class="inv-btn tf2-btn" id="tf2Nav" aria-label="TF2 Key">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="15" r="4.2"/><path d="M11 12 21 2M17.4 5.6l2.2 2.2M14.7 8.3l2.2 2.2"/></svg>
+          <span data-i18n="navTf2">کلید TF2</span>
         </button>
 
         <button class="inv-btn" id="invNav" aria-label="Inventory">
@@ -60,6 +70,10 @@
     </div>
 
     <div class="hamburger-menu" id="hamburgerMenu" hidden>
+      <button class="hm__item" data-hm="marketNav">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>
+        <span data-i18n="navMarket">مارکت</span>
+      </button>
       <button class="hm__item" data-hm="invNav">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l9-4 9 4-9 4-9-4Z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>
         <span data-i18n="navInv">اینونتوری</span>
@@ -67,6 +81,10 @@
       <button class="hm__item" data-hm="raffleNav">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3.4M12 17.6V21M3 12h3.4M17.6 12H21M5.6 5.6l2.4 2.4M16 16l2.4 2.4M18.4 5.6 16 8M8 16l-2.4 2.4"/></svg>
         <span data-i18n="navRaffle">قرعه کشی</span>
+      </button>
+      <button class="hm__item" data-hm="tf2Nav">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="15" r="4.2"/><path d="M11 12 21 2M17.4 5.6l2.2 2.2M14.7 8.3l2.2 2.2"/></svg>
+        <span data-i18n="navTf2">کلید TF2</span>
       </button>
     </div>
   </header>
@@ -211,7 +229,29 @@
         <button class="btn btn--ghost" id="emptyReset" data-i18n="emptyReset">ریست فیلترها</button>
       </div>
     </section>
+
   </main>
+
+  <!-- ===== TF2 KEYS — نمای جداگانه (صفحه‌ی مستقل کلید TF2، جدا از مارکت) ===== -->
+  <section class="tf2-page" id="tf2Section">
+    <div class="container">
+      <div class="tf2-page__head">
+        <h2>
+          <span class="tf2__ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="15" r="4.2"/><path d="M11 12 21 2M17.4 5.6l2.2 2.2M14.7 8.3l2.2 2.2"/></svg>
+          </span>
+          <span data-i18n="tf2Title">کلیدهای TF2</span>
+        </h2>
+        <button class="btn btn--ghost btn--sm" id="tf2Back" data-i18n="invBack">بازگشت به مارکت</button>
+      </div>
+      <p class="tf2__sub" data-i18n="tf2Sub">خرید کلید TF2 با تحویل فوری روی تلگرام.</p>
+      <div class="grid" id="tf2Grid"></div>
+      <div class="empty" id="tf2Empty" hidden>
+        <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="15" r="4.2"/><path d="M11 12 21 2M17.4 5.6l2.2 2.2M14.7 8.3l2.2 2.2"/></svg>
+        <p data-i18n="tf2Empty">فعلاً کلید TF2 برای فروش نیست.</p>
+      </div>
+    </div>
+  </section>
 
   <!-- ===== FOOTER ===== -->
   <footer class="footer reveal">
@@ -424,7 +464,7 @@
 
   <script src="js/supabase.min.js?v=1"></script>
   <script src="js/supabase-config.js?v=87"></script>
-  <script src="js/db.js?v=110"></script>
-  <script src="js/main.js?v=126"></script>
+  <script src="js/db.js?v=111"></script>
+  <script src="js/main.js?v=128"></script>
 </body>
 </html>

@@ -475,7 +475,7 @@ body.admin {
 .panel-card__body { padding: 20px; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
 /* ---------- inventory tools (search + count) ---------- */
-.inv-tools { display: flex; align-items: center; gap: 10px; }
+.inv-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .adm-search {
   display: flex; align-items: center; gap: 8px;
   background: rgba(7, 6, 4, .75);

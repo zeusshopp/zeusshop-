@@ -681,6 +681,18 @@ body.ann-on { overflow: hidden; }
 .inv-page { display: none; padding: 34px 0 70px; }
 body.is-inv .inv-page { display: block; animation: annIn .35s ease; }
 body.is-inv .hero, body.is-inv .market { display: none; }
+
+/* ===== TF2 KEYS PAGE (نمای جدا — دقیقاً مثل اینونتوری) ===== */
+.tf2-page { display: none; padding: 34px 0 70px; }
+body.is-tf2 .tf2-page { display: block; animation: annIn .35s ease; }
+body.is-tf2 .hero, body.is-tf2 .market { display: none; }
+body.is-inv .tf2-page { display: none; }
+.tf2-page__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 8px; flex-wrap: wrap;
+}
+.tf2-page__head h2 { font-size: 1.25rem; display: flex; align-items: center; gap: 10px; font-weight: 800; }
+.tf2-page__head + .tf2__sub { margin-bottom: 22px; }
 .inv-page__head {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   margin-bottom: 24px; flex-wrap: wrap;
@@ -709,8 +721,21 @@ body.is-inv .hero, body.is-inv .market { display: none; }
 }
 .inv-btn:hover svg { transform: scale(1.12); }
 .inv-btn:active { transform: translateY(0) scale(.98); }
-body.is-inv .inv-btn:not(.raffle-btn) { background: var(--accent); color: #221600; }
-body.is-inv .inv-btn:not(.raffle-btn) svg { color: #221600; }
+body.is-inv .inv-btn:not(.raffle-btn):not(.tf2-btn):not(.market-btn) { background: var(--accent); color: #221600; }
+body.is-inv .inv-btn:not(.raffle-btn):not(.tf2-btn):not(.market-btn) svg { color: #221600; }
+
+/* TF2 keys — header button (طلایی وقتی صفحه‌ی TF2 باز است) */
+.tf2-btn { border-color: rgba(240,194,75,.32); }
+body.is-tf2 .tf2-btn { background: var(--accent); color: #221600; }
+body.is-tf2 .tf2-btn svg { color: #221600; }
+.tf2__ico {
+  display: grid; place-items: center;
+  width: 38px; height: 38px; border-radius: 12px;
+  background: rgba(240,194,75,.09);
+  border: 1px solid rgba(240,194,75,.3);
+  color: var(--accent);
+}
+.tf2__sub { color: var(--muted); font-size: .85rem; }
 
 /* raffle button — same base, plus a small live dot */
 .raffle-btn::after {
@@ -1525,6 +1550,8 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
   .header__in.is-scrolled { max-width: calc(100% - 56px); height: 52px; }
   .header__in.is-scrolled ~ .searchbar { width: min(360px, calc(100% - 32px)); }
   .logo { font-size: 1.2rem; }
+  .market-btn { padding: 8px 10px; }
+  .market-btn span { display: none; }
   .hero { padding: 78px 0 56px; }
   .hero__bg { opacity: .24; }
   .hero__rings { width: 300px; height: 300px; }
@@ -1585,6 +1612,8 @@ html.to-rtl.is-switching .catalog__toolbar { --dx-out: 52px; --dx-in: -52px; --d
   .raffle-btn { padding: 8px 10px; }
   .raffle-btn span { display: none; }
   .raffle-btn::after { display: none; }
+  .tf2-btn { padding: 8px 10px; }
+  .tf2-btn span { display: none; }
   .raffle-modal { padding: 24px 16px 20px; border-radius: 20px; }
   .raffle-modal__title { font-size: 1.12rem; }
   .raffle-hub { width: 46px; height: 46px; }
