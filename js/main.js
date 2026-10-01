@@ -792,9 +792,10 @@ if (profileModal) {
     grid.innerHTML = list.map((s, idx) => {
       const r = RARITY[s.rarity] ? RARITY[s.rarity].color : "#f0c24b";
       const fi = floatInfo(s.float);
-      const delMode = s.delivery_mode === "days" ? "days" : "immediate";
+      const left = deliveryDaysLeft(s);
+      const delMode = (left === null || left <= 0) ? "immediate" : "days";
       const delTxt = delMode === "days"
-        ? (lang === "fa" ? `تحویل تا ${toFaDigits(s.delivery_days || 1)} روز` : `Delivery up to ${s.delivery_days || 1} days`)
+        ? (lang === "fa" ? `تحویل تا ${toFaDigits(left)} روز` : `Delivery up to ${left} days`)
         : (lang === "fa" ? "تحویل فوری" : "Instant delivery");
       return `
       <article class="card skin-card card--enter" style="--rarity:${r};animation-delay:${Math.min(idx, 11) * 60}ms" data-name="${s.name}" data-price="${s.price}">
@@ -808,7 +809,7 @@ if (profileModal) {
           <img src="${encImg(s.img)}" alt="${s.name}" loading="lazy" onerror="this.closest('.card__img').classList.add('is-missing')" />
         </div>
         <div class="card__body">
-          <div class="card__name" title="${s.name}">${s.name}</div>
+          <div class="card__name" title="${dispName(s.name)}">${dispName(s.name)}</div>
           <span class="card__del card__del--${delMode}">${delTxt}</span>
           <div class="card__bottom">
             <span class="card__price">${priceInner(s)}</span>
@@ -852,6 +853,13 @@ if (profileModal) {
     if (typeof renderTf2 === "function") renderTf2();
     refreshHero();
   }
+
+  /* step the delivery countdown down at midnight (no reload needed) */
+  let _dday = new Date().toDateString();
+  setInterval(() => {
+    const d = new Date().toDateString();
+    if (d !== _dday) { _dday = d; globalState(); }
+  }, 60000);
 
   let searchTimer = 0;
   searchInput.addEventListener("input", () => {
@@ -969,7 +977,7 @@ if (profileModal) {
         return `<div class="cart-item" style="--rarity:${r}">
           <div class="cart-item__img"><img src="${encImg(s.img)}" alt="${s.name}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><circle cx=%2211%22 cy=%2211%22 r=%227%22 fill=%22%232b261a%22/><path d=%22m20 20-3.2-3.2%22 stroke=%22%23f0c24b%22/></svg>'"/></div>
           <div class="cart-item__info">
-            <div class="cart-item__name">${s.name}</div>
+            <div class="cart-item__name">${dispName(s.name)}</div>
             ${isTf2(s) ? "" : `<div class="cart-item__meta"><b>${s.wear}</b> · ${s.weapon}${fi ? ` · <span class="cart-item__float" style="color:${fi.color}" title="${t("lblFloat")} ${fmtFloat(s.float, 6)}">${fmtFloat(s.float)}</span>` : ""}</div>`}
           </div>
           <span class="cart-item__price">${priceInner(s)}</span>
@@ -997,9 +1005,10 @@ if (profileModal) {
 
   function skinRowsHTML(s) {
     const r = RARITY[s.rarity] ? RARITY[s.rarity].color : "#f0c24b";
-    const delMode = s.delivery_mode === "days" ? "days" : "immediate";
+    const left = deliveryDaysLeft(s);
+    const delMode = (left === null || left <= 0) ? "immediate" : "days";
     const delTxt = delMode === "days"
-      ? (lang === "fa" ? `تا ${toFaDigits(s.delivery_days || 1)} روز` : `Up to ${s.delivery_days || 1} days`)
+      ? (lang === "fa" ? `تا ${toFaDigits(left)} روز` : `Up to ${left} days`)
       : (lang === "fa" ? "فوری" : "Instant");
     const typeTxt = (s.type === "StatTrak™" || s.type === "Souvenir") ? s.type : t("tyNormal");
     const fi = floatInfo(s.float);
@@ -1018,7 +1027,7 @@ if (profileModal) {
           <span class="skin-modal__weapon">${escT(s.weapon)}</span>
           <span class="skin-modal__badge">${escT(s.rarity)}</span>
         </div>
-        <h3 class="skin-modal__name">${escT(s.name)}</h3>
+        <h3 class="skin-modal__name">${escT(dispName(s.name))}</h3>
         <span class="skin-modal__bar"></span>
       </div>
       <div class="skin-specs">
@@ -1068,12 +1077,12 @@ if (profileModal) {
     const skin = skinModalCurrent;
     if (!skin) return;
     const name = skin.name;
-    if (cart.includes(name)) { showToast(t("tInCart", { name })); closeSkinModal(); openCart(); return; }
+    if (cart.includes(name)) { showToast(t("tInCart", { name: dispName(name) })); closeSkinModal(); openCart(); return; }
     requireTelegram(() => {
       cart.push(name);
       saveCart();
       renderCart();
-      showToast(t("tAdded", { name }));
+      showToast(t("tAdded", { name: dispName(name) }));
       updateSkinModalBtn();
       closeSkinModal();
       openCart();
@@ -1112,7 +1121,7 @@ if (profileModal) {
           <img src="${encImg(s.img)}" alt="${s.name}" loading="lazy" onerror="this.closest('.card__img').classList.add('is-missing')" />
         </div>
         <div class="card__body">
-          <div class="card__name" title="${s.name}">${s.name}</div>
+          <div class="card__name" title="${dispName(s.name)}">${dispName(s.name)}</div>
           <div class="card__bottom">
             <span class="card__price">${priceInner(s)}</span>
           </div>
@@ -1128,12 +1137,12 @@ if (profileModal) {
     const name = card.dataset.name || "";
     const item = findSkin(name);
     if (!item) return;
-    if (cart.includes(name)) { showToast(t("tInCart", { name })); openCart(); return; }
+    if (cart.includes(name)) { showToast(t("tInCart", { name: dispName(name) })); openCart(); return; }
     requireTelegram(() => {
       cart.push(name);
       saveCart();
       renderCart();
-      showToast(t("tAdded", { name }));
+      showToast(t("tAdded", { name: dispName(name) }));
       openCart();
     });
   });
@@ -1272,7 +1281,7 @@ if (profileModal) {
     payItemsEl.innerHTML = (payFlow.items || []).map(n => {
       const s = findSkin(n);
       const price = s ? skinFinalPrice(s) : 0;
-      return `<div class="pay-item"><span>${escT(s ? s.name : n)}</span><b>${twoFix(price)} ${unitTxt()}</b></div>`;
+      return `<div class="pay-item"><span>${escT(dispName(s ? s.name : n))}</span><b>${twoFix(price)} ${unitTxt()}</b></div>`;
     }).join("");
     if (payFlow.discountAmt > 0 && payFlow.couponCode) {
       payItemsEl.insertAdjacentHTML("beforeend",
@@ -1438,8 +1447,8 @@ if (profileModal) {
       const EMOJIS = ["✅", "❤️‍🔥", "💸", "🛍️", "⭐", "💎", "🎁", "⚡", "🔫", "🛡️"];
       const items = cart.map((n, idx) => {
         const s = findSkin(n);
-        if (!s) return n;
-        return `${s.name} — ${twoFix(skinFinalPrice(s))} ${unitTxt()}${EMOJIS[idx % EMOJIS.length]}`;
+        if (!s) return dispName(n);
+        return `${dispName(s.name)} — ${twoFix(skinFinalPrice(s))} ${unitTxt()}${EMOJIS[idx % EMOJIS.length]}`;
       }).filter(Boolean);
       const total = cartFinal();
       const discountAmt = cartDiscount();
@@ -1679,7 +1688,7 @@ if (profileModal) {
             <img src="${encImg(it.img)}" alt="${it.name}" loading="lazy" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><circle cx=%2211%22 cy=%2211%22 r=%227%22 fill=%22%232b261a%22/><path d=%22m20 20-3.2-3.2%22 stroke=%22%23f0c24b%22/></svg>'" />
           </div>
           <div class="card__body">
-            <div class="card__name" title="${it.name}">${it.name}</div>
+            <div class="card__name" title="${dispName(it.name)}">${dispName(it.name)}</div>
             <div class="card__meta"><b>${it.wear || ""}</b>${metaPts.length ? " · " + metaPts.join(" · ") : ""}</div>
             <div class="card__bottom">
               <span class="card__price">${fmtNum(it.price)} <small>${unitTxt()}</small></span>
@@ -1854,7 +1863,7 @@ if (profileModal) {
               : `<em>${weaponL ? escT(weaponL.charAt(0)) : "؟"}</em>`}
           </span>
           <span class="bought__meta">
-            <b title="${escT(name)}">${name ? escT(name) : "؟"}</b>
+            <b title="${escT(dispName(name))}">${name ? escT(dispName(name)) : "؟"}</b>
             <i>${fmtPrice(price)}</i>
           </span>
         </span>

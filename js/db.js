@@ -45,6 +45,23 @@ function fmtFloat(v, dp) {
   return n.toFixed(dp == null ? 4 : Number(dp));
 }
 
+/* ---------- delivery countdown ----------
+   For delivery_mode="days": returns the days still left =
+   total - calendar days since created_at (0 = deliverable now).
+   Returns null for immediate products (no countdown).        */
+function deliveryDaysLeft(s) {
+  if (!s || s.delivery_mode !== "days") return null;
+  const total = Number(s.delivery_days) || 0;
+  if (total <= 0) return null;
+  const t0 = Date.parse(s.created_at || "");
+  if (!Number.isFinite(t0)) return total;           /* no start date → full count */
+  const a = new Date(t0); a.setHours(0, 0, 0, 0);
+  const b = new Date();   b.setHours(0, 0, 0, 0);
+  const elapsed = Math.floor((b - a) / 86400000);
+  if (elapsed < 0) return total;                    /* clock skew → don't overshoot */
+  return Math.max(0, Math.min(total, total - elapsed));
+}
+
 /* ---------- connection state ---------- */
 const DB_URL = (typeof SUPA_PROJECT_URL === "string" ? SUPA_PROJECT_URL : "").trim();
 const DB_KEY = (typeof SUPA_ANON_KEY === "string" ? SUPA_ANON_KEY : "").trim();
@@ -121,6 +138,7 @@ function normSkin(s) {
     sort: Number(s.sort) || 0,
     delivery_mode: s.delivery_mode === "days" ? "days" : "immediate",
     delivery_days: Math.max(0, Math.min(30, Math.round(Number(s.delivery_days) || 0))),
+    created_at: s.created_at || null,
   };
   return out;
 }
@@ -178,6 +196,9 @@ const getSkins = () => {
   return [...custom, ...base];
 };
 const findSkin = name => getSkins().find(s => s.name === name);
+/* shop display only: hide the automatic " (2)" duplicate suffix — the FULL
+   name stays the key in the DB, cart, inventory and the admin panel */
+const dispName = n => String(n || "").replace(/\s*\(\d+\)$/, "");
 
 const getOrders = () => {
   const src = Array.isArray(ordersCache) ? ordersCache : [];
@@ -386,6 +407,10 @@ function dbFlushOps() {
 
 function saveCustom(list) {
   list = (Array.isArray(list) ? list : []).map(normSkin).filter(s => s.name);
+  /* one name = one product (last wins) — duplicates make the DB upsert fail */
+  const byName = new Map();
+  for (const s of list) byName.set(s.name, s);
+  list = Array.from(byName.values());
   if (DB_MODE && DB_READY) {
     const prev = catCache || [];
     catCache = list.slice().sort((a, b) => a.sort - b.sort);
@@ -608,7 +633,9 @@ function dbLog(err) {
     if (now - dbToastT > 2500) {   /* don't spam the same toast on every subscriber */
       dbToastT = now;
       try {
-        const shortMsg = msg.length > 96 ? msg.slice(0, 93) + "…" : msg;
+        const shortMsg = /affect row a second time/i.test(msg)
+          ? (lang === "fa" ? "نام تکراری در محصولات" : "duplicate product name")
+          : (msg.length > 96 ? msg.slice(0, 93) + "…" : msg);
         showToast(lang === "fa"
           ? "خطا در ارتباط با سرور — تغییرات ذخیره نشد." + (shortMsg ? " («" + shortMsg + "»)" : "")
           : "Cannot reach server — changes not saved." + (shortMsg ? " («" + shortMsg + "»)" : ""), true);
@@ -627,12 +654,19 @@ function dbUpsert(table, rows, conflict) {
 
 function dbSyncCatalog(list, goneNames) {
   if (!DB_READY || !supa) return;
+  /* safety net: a single upsert may not contain two rows with the same name —
+     Postgres rejects it ("ON CONFLICT DO UPDATE command cannot affect row a
+     second time") and the whole save would fail (last one wins) */
+  const byName = new Map();
+  for (const s of (Array.isArray(list) ? list : [])) if (s && s.name) byName.set(s.name, s);
+  list = Array.from(byName.values());
   const rows = list.map(s => ({
     name: s.name, img: s.img, weapon: s.weapon, wear: s.wear,
     rarity: s.rarity, type: s.type, price: s.price, discount: s.discount, sort: s.sort || 0,
     float: s.float == null ? null : Number(s.float),
     delivery_mode: s.delivery_mode === "days" ? "days" : "immediate",
     delivery_days: Math.max(0, Math.min(30, Math.round(Number(s.delivery_days) || 0))),
+    created_at: s.created_at || undefined,
   }));
   const gone = Array.isArray(goneNames) ? goneNames : [];
   deltaDb("skins", rows, gone);
@@ -961,7 +995,7 @@ function rowsSig(rows, table) {
   for (const r of arr) {
     if (table === "skins") {
       const i = String(r && r.img || "");
-      h = (h * 31 + hashStr((r && r.name || "") + "|" + (r && r.price || 0) + "|" + (r && r.discount || 0) + "|" + (r && r.sort || 0) + "|" + (r && r.delivery_mode || "") + "|" + (r && r.delivery_days || 0) + "|" + (r && r.type || "") + "|" + (r && r.weapon || "") + "|" + (r && r.wear || "") + "|" + (r && r.rarity || "") + "|" + (r && r.float != null ? r.float : "") + "|" + i.length + "|" + i.slice(0, 20) + "|" + i.slice(-20))) >>> 0;
+      h = (h * 31 + hashStr((r && r.name || "") + "|" + (r && r.price || 0) + "|" + (r && r.discount || 0) + "|" + (r && r.sort || 0) + "|" + (r && r.delivery_mode || "") + "|" + (r && r.delivery_days || 0) + "|" + (r && r.type || "") + "|" + (r && r.weapon || "") + "|" + (r && r.wear || "") + "|" + (r && r.rarity || "") + "|" + (r && r.float != null ? r.float : "") + "|" + (r && r.created_at || "") + "|" + i.length + "|" + i.slice(0, 20) + "|" + i.slice(-20))) >>> 0;
     } else if (table === "orders") {
       const its = Array.isArray(r && r.items) ? r.items : [];
       h = (h * 31 + hashStr((r && r.id || 0) + "|" + (r && r.status || "") + "|" + (r && r.telegram || "") + "|" + (r && r.total || 0) + "|" + (r && r.date || "") + "|" + its.length + "|" + its.map(it => (it && it.name || "") + ":" + (it && it.price || 0)).join(","))) >>> 0;

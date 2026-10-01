@@ -972,6 +972,55 @@ const tog = e.target.closest("[data-cp-toggle]");
   let editingName = null;
   let imgData = null;
 
+  function setSkinTitle(editing, nm) {
+    const t = $id("skinModalTitle");
+    if (!t) return;
+    t.textContent = editing
+      ? FA(`ویرایش اسکین — ${nm}`, `Edit skin — ${nm}`)
+      : FA("افزودن اسکین جدید", "Add new skin");
+  }
+
+  /* load a product's data into the add/edit form (used by openModal) */
+  function fillSkin(s) {
+    if (!s) return;
+    fName.value = s.name;
+    if (fWeapon && s.weapon) {
+      let has = false;
+      for (const opt of fWeapon.options) if (opt.value === s.weapon) { has = true; break; }
+      if (has) { fWeapon.value = s.weapon; }
+      else {
+        const opt = document.createElement("option");
+        opt.value = s.weapon;
+        opt.textContent = s.weapon;
+        fWeapon.appendChild(opt);
+        fWeapon.value = s.weapon;
+      }
+    }
+    fWear.value = s.wear;
+    fRarity.value = RARITY_KEY[s.rarity] || "covert";
+    fPrice.value = s.price;
+    if (fFloat) fFloat.value = (s.float == null || !Number.isFinite(Number(s.float))) ? "" : s.float;
+    const d = skinDiscount(s);
+    fDisOn.checked = d > 0;
+    fDiscount.value = d > 0 ? d : "";
+    if (fType) {
+      let found = false;
+      for (const opt of fType.options) if (opt.value === s.type) { fType.value = opt.value; found = true; break; }
+      if (!found) fType.value = "Normal";
+    }
+    if (delivWrap) {
+      const days = s.delivery_mode === "days";
+      const imm = delivWrap.querySelector('input[value="immediate"]');
+      const lat = delivWrap.querySelector('input[value="days"]');
+      if (imm) imm.checked = !days;
+      if (lat) lat.checked = days;
+      if (delivDaysWrap) delivDaysWrap.hidden = !days;
+      if (fDelivDays) fDelivDays.value = days ? (Number(s.delivery_days) || 2) : "2";
+    }
+    updateDiscPreview();
+    updateFloatHint();
+  }
+
   function openModal(name, focusDisc) {
     editingName = name || null;
     imgData = null;
@@ -990,49 +1039,8 @@ const tog = e.target.closest("[data-cp-toggle]");
     const empty = $id("fImgEmpty");
     if (prev) prev.hidden = true;
     if (empty) empty.hidden = false;
-    const modalTitle = $id("skinModalTitle");
-    if (modalTitle) modalTitle.textContent = name
-      ? FA(`ویرایش اسکین — ${name}`, `Edit skin — ${name}`)
-      : FA("افزودن اسکین جدید", "Add new skin");
-    if (name) {
-      const s = findSkin(name);
-      if (s) {
-        fName.value = s.name;
-        if (fWeapon && s.weapon) {
-          let has = false;
-          for (const opt of fWeapon.options) if (opt.value === s.weapon) { has = true; break; }
-          if (has) { fWeapon.value = s.weapon; }
-          else {
-            const opt = document.createElement("option");
-            opt.value = s.weapon;
-            opt.textContent = s.weapon;
-            fWeapon.appendChild(opt);
-            fWeapon.value = s.weapon;
-          }
-        }
-        fWear.value = s.wear;
-        fRarity.value = RARITY_KEY[s.rarity] || "covert";
-        fPrice.value = s.price;
-        if (fFloat) fFloat.value = (s.float == null || !Number.isFinite(Number(s.float))) ? "" : s.float;
-        const d = skinDiscount(s);
-        fDisOn.checked = d > 0;
-        fDiscount.value = d > 0 ? d : "";
-        if (fType) {
-          let found = false;
-          for (const opt of fType.options) if (opt.value === s.type) { fType.value = opt.value; found = true; break; }
-          if (!found) fType.value = "Normal";
-        }
-        if (delivWrap) {
-          const days = s.delivery_mode === "days";
-          const imm = delivWrap.querySelector('input[value="immediate"]');
-          const lat = delivWrap.querySelector('input[value="days"]');
-          if (imm) imm.checked = !days;
-          if (lat) lat.checked = days;
-          if (delivDaysWrap) delivDaysWrap.hidden = !days;
-          if (fDelivDays) fDelivDays.value = days ? (Number(s.delivery_days) || 2) : "2";
-        }
-      }
-    }
+    setSkinTitle(!!name, name);
+    if (name) fillSkin(findSkin(name));
     if (focusDisc) {
       fDisOn.checked = true;
       if (!fDiscount.value) fDiscount.value = "25";
@@ -1111,8 +1119,18 @@ const tog = e.target.closest("[data-cp-toggle]");
 
   skinForm.addEventListener("submit", e => {
     e.preventDefault();
-    const name = fName.value.trim();
+    let name = fName.value.trim();
     if (!name) { showToast(FA("نام اسکین را وارد کنید", "Enter a skin name"), true); fName.focus(); return; }
+    /* duplicates never error: an existing name automatically gets a " (2)"
+       suffix, so a second P90 is added as a SEPARATE product
+       (the first one is never overwritten) */
+    let nameSuffixed = false;
+    if (name !== editingName && findSkin(name)) {
+      let n = 2;
+      while (findSkin(`${name} (${n})`)) n++;
+      name = `${name} (${n})`;
+      nameSuffixed = true;
+    }
     const price = parseFloat(fPrice.value);
     if (isNaN(price) || price <= 0) { showToast(FA("قیمت معتبر وارد کنید", "Enter a valid price"), true); fPrice.focus(); return; }
 
@@ -1142,6 +1160,17 @@ const tog = e.target.closest("[data-cp-toggle]");
       }
     }
 
+    /* delivery countdown start: reset only when the delivery setting
+       actually changes (or the product has no start yet) — editing
+       price/image etc. keeps the existing count running */
+    const prev = editingName ? findSkin(editingName) : null;
+    const delivChanged = !prev
+      || prev.delivery_mode !== delMode
+      || (delMode === "days" && (Number(prev.delivery_days) || 0) !== delDays);
+    const createdAt = (delivChanged || !(prev && prev.created_at))
+      ? new Date().toISOString()
+      : prev.created_at;
+
     const obj = {
       name: name,
       img: imgData || (editingName ? (findSkin(editingName) || {}).img : ""),
@@ -1154,6 +1183,7 @@ const tog = e.target.closest("[data-cp-toggle]");
       float: floatVal,
       delivery_mode: delMode,
       delivery_days: delDays,
+      created_at: createdAt,
     };
 
     let custom = getCustom();
@@ -1168,7 +1198,11 @@ const tog = e.target.closest("[data-cp-toggle]");
     saveDel([...new Set(deleted)]);
     closeModal();
     renderAll();
-    showToast(discount > 0 ? FA(`اسکین ثبت شد ✓ (${discount}٪ تخفیف)`, `Skin saved (${discount}% off) ✓`) : FA("اسکین ثبت شد ✓", "Skin saved ✓"));
+    showToast(nameSuffixed
+      ? FA(`اسکین ثبت شد ✓ — نام تکراری بود، شد «${name}»`, `Skin saved ✓ — duplicate name became "${name}"`)
+      : discount > 0
+        ? FA(`اسکین ثبت شد ✓ (${discount}٪ تخفیف)`, `Skin saved (${discount}% off) ✓`)
+        : FA("اسکین ثبت شد ✓", "Skin saved ✓"));
   });
 
   /* ---------- delete skin ---------- */
