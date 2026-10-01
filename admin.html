@@ -6,8 +6,8 @@
   <title>پنل مدیریت | ZEUSSHOP</title>
   <link rel="icon" type="image/png" href="image/fav.png" />
   <link rel="stylesheet" href="css/fonts.css?v=87" />
-  <link rel="stylesheet" href="css/style.css?v=112" />
-  <link rel="stylesheet" href="css/admin.css?v=95" />
+  <link rel="stylesheet" href="css/style.css?v=113" />
+  <link rel="stylesheet" href="css/admin.css?v=96" />
 </head>
 <body class="admin">
   <aside class="admin__side" id="sideBar">
@@ -558,6 +558,12 @@
             <p class="disc-preview" id="fDiscPreview" hidden></p>
             <p class="field__hint" data-i18n="admFDiscHint">روشن کردن تخفیف، قیمت قدیم (خط‌خورده) و قیمت نمایشی را با هم روی کارت نشان می‌دهد.</p>
           </div>
+          <div class="field">
+            <label class="field__label" data-i18n="admFFloat">فلوت (۰ تا ۱)</label>
+            <input class="field__input" id="fFloat" type="number" min="0" max="1" step="0.000001" dir="ltr" placeholder="0.023456" />
+            <div class="float-hint" id="fFloatHint" hidden></div>
+            <p class="field__hint">اختیاری — خالی یعنی بدون فلوت</p>
+          </div>
           <div class="field field--full">
             <label class="field__label" data-i18n="admFDeliv">زمان تحویل این اسکین</label>
             <div class="deliv-opt" id="delivWrap">
@@ -684,8 +690,8 @@
 
   <script src="js/supabase.min.js?v=1"></script>
   <script src="js/supabase-config.js?v=87"></script>
-  <script src="js/db.js?v=111"></script>
-  <script src="js/main.js?v=128"></script>
-  <script src="js/admin.js?v=111"></script>
+  <script src="js/db.js?v=112"></script>
+  <script src="js/main.js?v=129"></script>
+  <script src="js/admin.js?v=112"></script>
 </body>
 </html>

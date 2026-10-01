@@ -81,7 +81,7 @@ const I18N = {
     skinBuy: "افزودن به سبد خرید",
     skinInCart: "در سبد خرید ✓",
     lblName: "اسم گان", lblWeapon: "گان", lblType: "نوع",
-    lblWear: "وضعیت", lblRarity: "راریتی", lblDelivery: "تحویل",
+    lblWear: "وضعیت", lblRarity: "راریتی", lblDelivery: "تحویل", lblFloat: "فلوت",
     tCheckout: "سفارش ثبت شد! پیام آن در تلگرام مدیریت (<b>@ZEUS_ADMIN0</b>) ارسال شد.",
     ckWaitSec: "برای جلوگیری از اسپم، {s} ثانیه صبر کن.",
     ckTooFast: "سفارشات شما زیاد است؛ لطفاً کمی صبر کن.",
@@ -179,7 +179,7 @@ const I18N = {
     skinBuy: "Add to cart",
     skinInCart: "In cart ✓",
     lblName: "Skin", lblWeapon: "Weapon", lblType: "Type",
-    lblWear: "Wear", lblRarity: "Rarity", lblDelivery: "Delivery",
+    lblWear: "Wear", lblRarity: "Rarity", lblDelivery: "Delivery", lblFloat: "Float",
     tCheckout: "Order placed! Sent to admin Telegram (<b>@ZEUS_ADMIN0</b>).",
     ckWaitSec: "Wait {s}s to prevent spam.",
     ckTooFast: "Too many orders — please wait a moment.",
@@ -791,6 +791,7 @@ if (profileModal) {
   function render(list) {
     grid.innerHTML = list.map((s, idx) => {
       const r = RARITY[s.rarity] ? RARITY[s.rarity].color : "#f0c24b";
+      const fi = floatInfo(s.float);
       const delMode = s.delivery_mode === "days" ? "days" : "immediate";
       const delTxt = delMode === "days"
         ? (lang === "fa" ? `تحویل تا ${toFaDigits(s.delivery_days || 1)} روز` : `Delivery up to ${s.delivery_days || 1} days`)
@@ -811,6 +812,7 @@ if (profileModal) {
           <span class="card__del card__del--${delMode}">${delTxt}</span>
           <div class="card__bottom">
             <span class="card__price">${priceInner(s)}</span>
+            ${fi ? `<span class="card__float" style="--fc:${fi.color}" title="${t("lblFloat")} ${fmtFloat(s.float, 6)}">${fmtFloat(s.float)}</span>` : ""}
           </div>
         </div>
       </article>`;
@@ -963,11 +965,12 @@ if (profileModal) {
         const s = findSkin(name);
         if (!s) return "";
         const r = RARITY[s.rarity] ? RARITY[s.rarity].color : "#f0c24b";
+        const fi = floatInfo(s.float);
         return `<div class="cart-item" style="--rarity:${r}">
           <div class="cart-item__img"><img src="${encImg(s.img)}" alt="${s.name}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><circle cx=%2211%22 cy=%2211%22 r=%227%22 fill=%22%232b261a%22/><path d=%22m20 20-3.2-3.2%22 stroke=%22%23f0c24b%22/></svg>'"/></div>
           <div class="cart-item__info">
             <div class="cart-item__name">${s.name}</div>
-            ${isTf2(s) ? "" : `<div class="cart-item__meta"><b>${s.wear}</b> · ${s.weapon}</div>`}
+            ${isTf2(s) ? "" : `<div class="cart-item__meta"><b>${s.wear}</b> · ${s.weapon}${fi ? ` · <span class="cart-item__float" style="color:${fi.color}" title="${t("lblFloat")} ${fmtFloat(s.float, 6)}">${fmtFloat(s.float)}</span>` : ""}</div>`}
           </div>
           <span class="cart-item__price">${priceInner(s)}</span>
           <button class="cart-item__remove" data-remove="${name}" aria-label="×">×</button>
@@ -999,9 +1002,11 @@ if (profileModal) {
       ? (lang === "fa" ? `تا ${toFaDigits(s.delivery_days || 1)} روز` : `Up to ${s.delivery_days || 1} days`)
       : (lang === "fa" ? "فوری" : "Instant");
     const typeTxt = (s.type === "StatTrak™" || s.type === "Souvenir") ? s.type : t("tyNormal");
+    const fi = floatInfo(s.float);
     const ico = {
       type: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h8l8 8-6 6-8-8V6Z"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>',
       wear: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3s6 6.6 6 11a6 6 0 0 1-12 0C6 9.6 12 3 12 3Z"/></svg>',
+      float: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 15a8 8 0 0 1 16 0"/><path d="M12 15l4.5-4.5"/></svg>',
       rarity: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.5 14.6 8 20 8l-4.3 3.6L17.4 17 12 13.9 6.6 17l1.7-5.4L4 8l5.4 0L12 2.5Z"/></svg>',
       delivery: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>'
     };
@@ -1019,9 +1024,14 @@ if (profileModal) {
       <div class="skin-specs">
         ${spec(t("lblType"), escT(typeTxt), ico.type)}
         ${spec(t("lblWear"), escT(s.wear), ico.wear)}
+        ${fi ? spec(t("lblFloat"), fmtFloat(s.float, 6), ico.float, fi.color) : ""}
         ${spec(t("lblRarity"), escT(s.rarity), ico.rarity, r)}
         ${spec(t("lblDelivery"), delTxt, ico.delivery)}
-      </div>`;
+      </div>${fi ? `
+      <div class="float-meter" dir="ltr">
+        <div class="float-meter__track"><i style="left:clamp(7px, ${(s.float * 100).toFixed(2)}%, calc(100% - 7px));background:${fi.color}"></i></div>
+        <span class="float-meter__legend">${t("lblFloat")}: <b style="color:${fi.color}">${fmtFloat(s.float, 6)}</b> · ${fi.key} — ${escT(fi.fa)}</span>
+      </div>` : ""}`;
   }
 
   function updateSkinModalBtn() {
@@ -1657,6 +1667,10 @@ if (profileModal) {
         const metaPts = it.type === "TF2"
           ? ["TF2"]
           : [it.weapon, it.wear, it.type && it.type !== "Normal" ? it.type : null].filter(Boolean);
+        if (it.type !== "TF2") {
+          const sk = findSkin(it.name);
+          if (sk && sk.float != null) metaPts.push(fmtFloat(sk.float));
+        }
         const date = (it.created_at || it.date) ? new Date((it.created_at || it.date)).toLocaleDateString(lang === "fa" ? "fa-IR" : "en-GB") : "";
         return `
         <article class="card card--inv" style="--rarity:${r}">

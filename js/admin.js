@@ -175,6 +175,7 @@ if (adminMain) {
       const r = RARITY[s.rarity] ? RARITY[s.rarity].color : "#f0c24b";
       const d = skinDiscount(s);
       const isOff = d > 0;
+      const fi = floatInfo(s.float);
       return `
       <article class="card skin-card card--enter${isOff ? " is-off" : ""}" style="--rarity:${r};animation-delay:${Math.min(idx, 11) * 40}ms" data-name="${s.name}">
         <div class="card__img">
@@ -183,7 +184,7 @@ if (adminMain) {
         </div>
         <div class="card__body">
           <div class="card__name" title="${s.name}">${s.name}</div>
-          <div class="card__meta"><b>${s.wear}</b> · ${s.weapon}</div>
+          <div class="card__meta"><b>${s.wear}</b> · ${s.weapon}${fi ? ` · <span class="adm-float" style="color:${fi.color}" title="Float ${fmtFloat(s.float, 6)}">${fmtFloat(s.float)}</span>` : ""}</div>
           <div class="card__bottom">
             <span class="card__price">${priceInner(s)}</span>
           </div>
@@ -964,7 +965,7 @@ const tog = e.target.closest("[data-cp-toggle]");
   const fName = $id("fName"), fWeapon = $id("fWeapon"), fWear = $id("fWear"),
         fRarity = $id("fRarity"), fPrice = $id("fPrice"), fImg = $id("fImg"),
         fDisOn = $id("fDisOn"), fDiscount = $id("fDiscount"),
-        fType = $id("fType"),
+        fType = $id("fType"), fFloat = $id("fFloat"),
         delivWrap = $id("delivWrap"), delivDaysWrap = $id("delivDaysWrap"), fDelivDays = $id("fDelivDays"),
         closeSkinModal = $id("closeSkinModal"), cancelSkin = $id("cancelSkin");
 
@@ -1012,6 +1013,7 @@ const tog = e.target.closest("[data-cp-toggle]");
         fWear.value = s.wear;
         fRarity.value = RARITY_KEY[s.rarity] || "covert";
         fPrice.value = s.price;
+        if (fFloat) fFloat.value = (s.float == null || !Number.isFinite(Number(s.float))) ? "" : s.float;
         const d = skinDiscount(s);
         fDisOn.checked = d > 0;
         fDiscount.value = d > 0 ? d : "";
@@ -1039,6 +1041,7 @@ const tog = e.target.closest("[data-cp-toggle]");
     } else {
       updateDiscPreview();
     }
+    updateFloatHint();
     skinModal.classList.add("is-on");
     skinOverlay.classList.add("is-on");
   }
@@ -1048,6 +1051,17 @@ const tog = e.target.closest("[data-cp-toggle]");
     editingName = null;
     imgData = null;
   }
+
+  function updateFloatHint() {
+    const hint = $id("fFloatHint");
+    if (!hint) return;
+    const fi = fFloat ? floatInfo(String(fFloat.value).trim()) : null;
+    if (!fi) { hint.hidden = true; hint.textContent = ""; return; }
+    hint.hidden = false;
+    hint.textContent = `${fi.key} — ${fi.fa} · ${fmtFloat(fi.v, 6)}`;
+    hint.style.setProperty("--fc", fi.color);
+  }
+  if (fFloat) fFloat.addEventListener("input", updateFloatHint);
 
   function updateDiscPreview() {
     const pre = $id("fDiscPreview");
@@ -1106,6 +1120,17 @@ const tog = e.target.closest("[data-cp-toggle]");
     const discVal = parseInt(fDiscount.value, 10);
     const discount = discOn ? Math.max(0, Math.min(99, isNaN(discVal) ? 25 : discVal)) : 0;
 
+    let floatVal = null;
+    if (fFloat && String(fFloat.value).trim() !== "") {
+      const fv = parseFloat(fFloat.value);
+      if (isNaN(fv) || fv < 0 || fv > 1) {
+        showToast(FA("فلوت باید عددی بین ۰ تا ۱ باشد", "Float must be a number between 0 and 1"), true);
+        fFloat.focus();
+        return;
+      }
+      floatVal = fv;
+    }
+
     const typeVal = fType ? fType.value : "Normal";
     let delMode = "immediate";
     let delDays = 0;
@@ -1126,6 +1151,7 @@ const tog = e.target.closest("[data-cp-toggle]");
       type: typeVal,
       price: price,
       discount: discount,
+      float: floatVal,
       delivery_mode: delMode,
       delivery_days: delDays,
     };

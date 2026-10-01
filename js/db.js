@@ -21,6 +21,30 @@ const IS_ADMIN_PAGE = /admin\.html/i.test(location.pathname);
 /* normalize older saved rarity names */
 const R_NORM = { "Mil-Spec": "Mil-Spec Grade", "Industrial": "Industrial Grade", "Consumer": "Consumer Grade" };
 
+/* ---------- CS2 float (0..1) — shared helpers (shop + panel) ----------
+   Bands: FN <0.07 · MW <0.15 · FT <0.38 · WW <0.45 · BS ≤1 */
+const FLOAT_BANDS = [
+  { max: 0.07, key: "FN", fa: "Factory New", color: "#5fe08b" },
+  { max: 0.15, key: "MW", fa: "Minimal Wear", color: "#a3e05f" },
+  { max: 0.38, key: "FT", fa: "Field-Tested", color: "#f0c24b" },
+  { max: 0.45, key: "WW", fa: "Well-Worn", color: "#f0924b" },
+  { max: 1.000001, key: "BS", fa: "Battle-Scarred", color: "#e5654f" },
+];
+function floatInfo(v) {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0 || n > 1) return null;
+  for (let i = 0; i < FLOAT_BANDS.length; i++) {
+    if (n < FLOAT_BANDS[i].max) return { key: FLOAT_BANDS[i].key, fa: FLOAT_BANDS[i].fa, color: FLOAT_BANDS[i].color, v: n };
+  }
+  return null;
+}
+function fmtFloat(v, dp) {
+  const n = Number(v);
+  if (v == null || v === "" || !Number.isFinite(n)) return "";
+  return n.toFixed(dp == null ? 4 : Number(dp));
+}
+
 /* ---------- connection state ---------- */
 const DB_URL = (typeof SUPA_PROJECT_URL === "string" ? SUPA_PROJECT_URL : "").trim();
 const DB_KEY = (typeof SUPA_ANON_KEY === "string" ? SUPA_ANON_KEY : "").trim();
@@ -93,6 +117,7 @@ function normSkin(s) {
     type: String(s.type || "Normal"),
     price: Number(s.price) || 0,
     discount: Math.max(0, Math.min(100, Number(s.discount) || 0)),
+    float: floatInfo(s.float) ? Number(s.float) : null,
     sort: Number(s.sort) || 0,
     delivery_mode: s.delivery_mode === "days" ? "days" : "immediate",
     delivery_days: Math.max(0, Math.min(30, Math.round(Number(s.delivery_days) || 0))),
@@ -605,6 +630,7 @@ function dbSyncCatalog(list, goneNames) {
   const rows = list.map(s => ({
     name: s.name, img: s.img, weapon: s.weapon, wear: s.wear,
     rarity: s.rarity, type: s.type, price: s.price, discount: s.discount, sort: s.sort || 0,
+    float: s.float == null ? null : Number(s.float),
     delivery_mode: s.delivery_mode === "days" ? "days" : "immediate",
     delivery_days: Math.max(0, Math.min(30, Math.round(Number(s.delivery_days) || 0))),
   }));
@@ -616,13 +642,36 @@ function dbSyncCatalog(list, goneNames) {
    stale upsert re-inserts a skin — the panel (reading catCache) looks correct
    while the shop still shows the item for sale. One writer at a time, in order. */
 let dbDeltaChain = Promise.resolve();
+let floatColWarned = false;
+function warnFloatColumn() {
+  if (floatColWarned) return;
+  floatColWarned = true;
+  console.warn('ZEUSSHOP db: skins.float column missing — run in Supabase SQL Editor: alter table public.skins add column if not exists "float" numeric;');
+  try {
+    if (typeof showToast === "function" && typeof lang !== "undefined") showToast(lang === "fa"
+      ? '⚠️ ستون float هنوز در دیتابیس ساخته نشده — این دستور را در Supabase SQL Editor اجرا کن: alter table public.skins add column if not exists "float" numeric;'
+      : '⚠️ The float column is missing in the DB — run in Supabase SQL Editor: alter table public.skins add column if not exists "float" numeric;', true);
+  } catch { /* toast optional */ }
+}
+
 function deltaDb(table, rows, gone) {
   if (!supa) return;
   dbDeltaChain = dbDeltaChain.catch(() => {}).then(() => {
     const chain = (gone.length)
       ? supa.from(table).delete().in("name", gone).then(r => { if (r.error) dbLog(r.error); return r; }).catch(dbLog)
       : Promise.resolve();
-    if (rows.length) return chain.then(() => dbUpsert(table, rows, "name"));
+    if (rows.length) {
+      return chain.then(() => dbUpsert(table, rows, "name")).then(r => {
+        /* the float column may not exist yet (SQL not run): retry WITHOUT it so
+           catalog saves keep working, and say so once, clearly */
+        const msg = r && r.error ? String(r.error.message || r.error.code || "") : "";
+        if (table === "skins" && /float/i.test(msg)) {
+          warnFloatColumn();
+          return dbUpsert(table, rows.map(row => { const c = Object.assign({}, row); delete c.float; return c; }), "name");
+        }
+        return r;
+      });
+    }
     return chain;
   }).catch(dbLog);
 }
@@ -912,7 +961,7 @@ function rowsSig(rows, table) {
   for (const r of arr) {
     if (table === "skins") {
       const i = String(r && r.img || "");
-      h = (h * 31 + hashStr((r && r.name || "") + "|" + (r && r.price || 0) + "|" + (r && r.discount || 0) + "|" + (r && r.sort || 0) + "|" + (r && r.delivery_mode || "") + "|" + (r && r.delivery_days || 0) + "|" + (r && r.type || "") + "|" + (r && r.weapon || "") + "|" + (r && r.wear || "") + "|" + (r && r.rarity || "") + "|" + i.length + "|" + i.slice(0, 20) + "|" + i.slice(-20))) >>> 0;
+      h = (h * 31 + hashStr((r && r.name || "") + "|" + (r && r.price || 0) + "|" + (r && r.discount || 0) + "|" + (r && r.sort || 0) + "|" + (r && r.delivery_mode || "") + "|" + (r && r.delivery_days || 0) + "|" + (r && r.type || "") + "|" + (r && r.weapon || "") + "|" + (r && r.wear || "") + "|" + (r && r.rarity || "") + "|" + (r && r.float != null ? r.float : "") + "|" + i.length + "|" + i.slice(0, 20) + "|" + i.slice(-20))) >>> 0;
     } else if (table === "orders") {
       const its = Array.isArray(r && r.items) ? r.items : [];
       h = (h * 31 + hashStr((r && r.id || 0) + "|" + (r && r.status || "") + "|" + (r && r.telegram || "") + "|" + (r && r.total || 0) + "|" + (r && r.date || "") + "|" + its.length + "|" + its.map(it => (it && it.name || "") + ":" + (it && it.price || 0)).join(","))) >>> 0;

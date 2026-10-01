@@ -19,6 +19,7 @@
 -- 2) helper functions (is_admin, count_users, checkout_allowed,
 --    admin_self_register)
 -- 3) orders: coupon column + primary key + indexes
+-- 3b) skins: float column (CS2 wear float 0..1)
 -- 4) every RLS policy, dropped & re-created INSIDE one DO block
 --    (direct DDL → "policy already exists" (42710) never happens)
 -- 5) default payment card
@@ -107,6 +108,11 @@ begin
     execute 'create index idx_orders_status on public.orders (status)';
   end if;
 end $$;
+
+-- 3b) SKINS: float column (CS2 wear float 0..1) -------------------
+-- Optional per-product float (0.000000 - 1.000000); NULL = not set.
+-- Covered by the existing skins RLS policies (table-level) — no new policy needed.
+alter table public.skins add column if not exists "float" numeric;
 
 -- 4) POLICIES (drop-then-create, one block each) ------------------
 
