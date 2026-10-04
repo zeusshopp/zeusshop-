@@ -1353,6 +1353,15 @@ html[dir="ltr"] .skin-modal__body { direction: ltr; }
 .field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(240,194,75,.15); }
 .field-input::placeholder { color: var(--muted); }
 .field-note { font-size: .76rem; color: var(--muted); margin: 10px 0 20px; line-height: 1.7; }
+.field-hintlink {
+  display: inline-block;
+  font-size: .76rem; font-weight: 700;
+  color: var(--accent);
+  margin: 8px 0 0;
+  text-decoration: underline; text-underline-offset: 3px;
+  transition: opacity .15s ease;
+}
+.field-hintlink:hover { opacity: .82; }
 
 /* Requirement modal */
 .modal__icon {
