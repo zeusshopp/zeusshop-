@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="image/fav.png" />
   <link rel="stylesheet" href="css/fonts.css?v=87" />
   <link rel="stylesheet" href="css/style.css?v=113" />
-  <link rel="stylesheet" href="css/admin.css?v=96" />
+  <link rel="stylesheet" href="css/admin.css?v=97" />
 </head>
 <body>
 
@@ -361,6 +361,10 @@
         <input type="text" id="telegramInput" class="field-input" dir="auto" data-i18n-ph="profileTgPlace" placeholder="@username یا +98912..." autocomplete="off" />
         <p class="field-note" data-i18n="profileNote">اسکین‌های خریداری‌شده روی همین آیدی تلگرام تحویل داده می‌شوند.</p>
 
+        <label class="field-label" for="tradeInput" data-i18n="profileTradeLabel">لینک ترید استیم</label>
+        <input type="text" id="tradeInput" class="field-input" dir="ltr" data-i18n-ph="profileTradePlace" placeholder="https://steamcommunity.com/tradeoffer/new/?partner=..." autocomplete="off" />
+        <p class="field-note" data-i18n="profileTradeNote">برای دریافت اسکین، ادمین معامله (ترید) را از طریق همین لینک برایت می‌فرستد.</p>
+
         <button class="btn btn--primary btn--block" id="saveProfile" data-i18n="profileSave">ذخیره پروفایل</button>
       </div>
     </div>
@@ -376,7 +380,7 @@
         </svg>
       </div>
       <h3 class="modal__title" data-i18n="reqTitle">ابتدا وارد پروفایل شوید</h3>
-      <p class="modal__text" data-i18n="reqText">برای ثبت سفارش باید آیدی تلگرام خود را در پروفایل ثبت کنید. بدون آن امکان خرید وجود ندارد.</p>
+      <p class="modal__text" data-i18n="reqText">برای ثبت سفارش باید آیدی تلگرام و لینک ترید استیم خود را در حساب کاربری ثبت کنید. بدون آن‌ها امکان خرید وجود ندارد.</p>
       <button class="btn btn--primary btn--block" id="goProfile" data-i18n="reqGo">رفتن به پروفایل</button>
       <button class="btn btn--ghost btn--block" id="skipNow" data-i18n="reqLater">بعداً</button>
     </div>
@@ -465,6 +469,6 @@
   <script src="js/supabase.min.js?v=1"></script>
   <script src="js/supabase-config.js?v=87"></script>
   <script src="js/db.js?v=115"></script>
-  <script src="js/main.js?v=131"></script>
+  <script src="js/main.js?v=132"></script>
 </body>
 </html>

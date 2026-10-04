@@ -420,6 +420,7 @@ if (adminMain) {
       if (!it || typeof it !== "object") return false;
       if (String(it.name || "").toLowerCase().includes(q)) return true;
       if (it.special === "receipt" && String(it.code || "").toLowerCase().includes(q)) return true;
+      if (it.special === "trade" && String(it.link || "").toLowerCase().includes(q)) return true;
       return false;
     });
   }
@@ -456,6 +457,13 @@ if (adminMain) {
          <button class="btn btn--sm btn--ghost" data-delord="${o.id}" title="${FA("حذف سفارش", "Delete order")}">${FA("حذف", "Delete")}</button>`
       : `<button class="btn btn--sm btn--ghost" data-delord="${o.id}" title="${FA("حذف سفارش از لیست", "Delete order")}">${FA("حذف", "Delete")}</button>`;
     const ordColor = st === "approved" ? "var(--success)" : st === "rejected" ? "var(--danger)" : "var(--warning)";
+    const tradeIt = (o.items || []).find(it => it && typeof it === "object" && it.special === "trade" && it.link);
+    const tradeTag = tradeIt ? `
+      <div class="order-row__trade">
+        <span class="order-row__trade-lbl">🔗 ${FA("لینک ترید", "Trade link")}</span>
+        <a class="order-row__trade-link" href="${esc(tradeIt.link)}" target="_blank" rel="noopener" dir="ltr" title="${esc(tradeIt.link)}">${FA("باز کردن ↗", "Open ↗")}</a>
+        <button class="btn btn--sm btn--ghost" data-copytrade="${esc(tradeIt.link)}" title="${FA("کپی لینک ترید", "Copy trade link")}">${FA("کپی", "Copy")}</button>
+      </div>` : "";
     return `
     <div class="order-row" style="--ord-c:${ordColor}">
       <div class="order-row__head">
@@ -467,6 +475,7 @@ if (adminMain) {
         <span class="order-row__date">${date || "—"}</span>
         <span class="order-row__tg">${esc(o.telegram || "")}</span>
       </div>
+      ${tradeTag}
       <div class="order-row__foot">
         <span class="order-row__total"><small>${FA("مجموع", "Total")}</small> ${fmtPrice(o.total)}${discTag}${codeTag}</span>
         <div class="order-row__actions">${actions}</div>
@@ -776,6 +785,25 @@ const tog = e.target.closest("[data-cp-toggle]");
   }
 
   async function ordersClickHandler(e) {
+    const ct = e.target.closest("[data-copytrade]");
+    if (ct) {
+      const link = ct.getAttribute("data-copytrade") || "";
+      if (link) {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link);
+          else {
+            const ta = document.createElement("textarea");
+            ta.value = link;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            ta.remove();
+          }
+        } catch { /* ignore */ }
+        showToast(FA("لینک ترید کپی شد ✓", "Trade link copied ✓"));
+      }
+      return;
+    }
     const rc = e.target.closest("[data-receipt]");
     if (rc) {
       openReceipt(rc.dataset.receipt || "", rc.dataset.receiptImg || "", rc.dataset.receiptOwner || "");

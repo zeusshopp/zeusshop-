@@ -70,12 +70,19 @@ const I18N = {
     profileTitle: "حساب کاربری", profileTgLabel: "آیدی تلگرام",
     profileTgPlace: "@username یا +98912...",
     profileNote: "اسکین‌های خریداری‌شده روی همین آیدی تلگرام تحویل داده می‌شوند.",
+    profileTradeLabel: "لینک ترید استیم",
+    profileTradePlace: "https://steamcommunity.com/tradeoffer/new/?partner=...",
+    profileTradeNote: "برای دریافت اسکین، ادمین معامله (ترید) را از طریق همین لینک برایت می‌فرستد.",
     profileSave: "ذخیره",
     reqTitle: "ابتدا وارد حساب کاربری شوید",
-    reqText: "برای ثبت سفارش باید آیدی تلگرام خود را در حساب کاربری ثبت کنید. بدون آن امکان خرید وجود ندارد.",
+    reqText: "برای ثبت سفارش باید آیدی تلگرام و لینک ترید استیم خود را در حساب کاربری ثبت کنید. بدون آن‌ها امکان خرید وجود ندارد.",
     reqGo: "رفتن به حساب کاربری", reqLater: "بعداً",
     tTgEmpty: "لطفاً آیدی تلگرام را وارد کنید.",
     tTgSaved: "آیدی تلگرام <b>{val}</b> ثبت شد.",
+    tTradeEmpty: "لینک ترید استیم را وارد کنید.",
+    tTradeBad: "لینک ترید معتبر نیست؛ لینک کامل steamcommunity.com/tradeoffer/new/ را کپی و جای‌گذاری کن.",
+    tTradeMissing: "برای خرید ابتدا لینک ترید استیم را در حساب کاربری ثبت کنید.",
+    tradeMsgLbl: "لینک ترید:",
     tAdded: "<b>{name}</b> به سبد اضافه شد",
     tInCart: "<b>{name}</b> از قبل در سبد است؛ سبد باز شد.",
     skinBuy: "افزودن به سبد خرید",
@@ -168,12 +175,19 @@ const I18N = {
     profileTitle: "My Account", profileTgLabel: "Telegram ID",
     profileTgPlace: "@username or +98912...",
     profileNote: "Purchased skins will be delivered to this Telegram ID.",
+    profileTradeLabel: "Steam trade link",
+    profileTradePlace: "https://steamcommunity.com/tradeoffer/new/?partner=...",
+    profileTradeNote: "The admin sends your trade offer through this link.",
     profileSave: "Save",
     reqTitle: "Open your account first",
-    reqText: "You must save your Telegram ID in your account before ordering. Purchases are blocked until then.",
+    reqText: "You must save your Telegram ID and Steam trade link in your account before ordering. Purchases are blocked until then.",
     reqGo: "Go to Account", reqLater: "Later",
     tTgEmpty: "Please enter your Telegram ID.",
     tTgSaved: "Telegram ID <b>{val}</b> saved.",
+    tTradeEmpty: "Enter your Steam trade link.",
+    tTradeBad: "Invalid trade link; paste the full steamcommunity.com/tradeoffer/new/ URL.",
+    tTradeMissing: "Save your Steam trade link in your account before buying.",
+    tradeMsgLbl: "Trade link:",
     tAdded: "<b>{name}</b> added to cart",
     tInCart: "<b>{name}</b> is already in cart; cart opened.",
     skinBuy: "Add to cart",
@@ -681,10 +695,24 @@ function setTelegram(v) {
   try { localStorage.setItem(TG_KEY, v); } catch { /* ignore */ }
 }
 
+const TRADE_KEY = "skm_trade_link";
+function getTrade() {
+  try { return String(localStorage.getItem(TRADE_KEY) || "").trim(); } catch { return ""; }
+}
+function setTrade(v) {
+  try { localStorage.setItem(TRADE_KEY, String(v || "").trim()); } catch { /* ignore */ }
+}
+/* Steam trade-offer URLs: steamcommunity.com/tradeoffer/new/?partner=..&token=..
+   (legacy steamcommunity.com/trade/id/... accepted too) */
+function validTrade(v) {
+  return /^https?:\/\/(?:www\.)?steamcommunity\.com\/(?:tradeoffer|trade)\//i.test(String(v || "").trim());
+}
+
 const profileModal = $id("profileModal");
 if (profileModal) {
   const profileOverlay = $id("profileOverlay");
   const telegramInput = $id("telegramInput");
+  const tradeInput = $id("tradeInput");
   const profileAvatar = $id("profileAvatar");
   const headerAvatar = $id("headerAvatar");
   const TG_AVATAR_FALLBACK = "data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><circle cx=%2212%22 cy=%228%22 r=%224%22 fill=%22%23c7b862%22/><path d=%22M4 21c0-4 3.6-6 8-6s8 2 8 6%22 fill=%22%23c7b862%22/></svg>";
@@ -709,11 +737,13 @@ if (profileModal) {
   }
   function openProfile() {
     telegramInput.value = getTelegram();
+    if (tradeInput) tradeInput.value = getTrade();
     applyTgAvatar();
     profileModal.classList.add("is-open");
     profileOverlay.classList.add("is-open");
     document.body.style.overflow = "hidden";
     if (!getTelegram()) setTimeout(() => telegramInput.focus(), 250);
+    else if (tradeInput && !getTrade()) setTimeout(() => tradeInput.focus(), 250);
   }
   function closeProfile() {
     profileModal.classList.remove("is-open");
@@ -736,9 +766,22 @@ if (profileModal) {
     if (!val.startsWith("@") && !val.startsWith("+")) {
       val = /^\d{9,15}$/.test(val) ? "+" + val : "@" + val;
     }
+    const tr = String(tradeInput ? tradeInput.value : "").trim();
+    if (!tr) {
+      showToast(t("tTradeEmpty"), true);
+      if (tradeInput) tradeInput.focus();
+      return;
+    }
+    if (!validTrade(tr)) {
+      showToast(t("tTradeBad"), true);
+      if (tradeInput) tradeInput.focus();
+      return;
+    }
     setTelegram(val);
+    setTrade(tr);
     addUser(val);
     telegramInput.value = val;
+    if (tradeInput) tradeInput.value = tr;
     applyTgAvatar();
     closeProfile();
     hideToast();
@@ -753,10 +796,17 @@ if (profileModal) {
   let pendingAction = null;
 
   function requireTelegram(cb) {
-    if (getTelegram()) { cb(); return; }
-    pendingAction = cb;
-    reqModal.classList.add("is-open");
-    reqOverlay.classList.add("is-open");
+    if (getTelegram() && getTrade()) { cb(); return; }
+    if (!getTelegram()) {
+      pendingAction = cb;
+      reqModal.classList.add("is-open");
+      reqOverlay.classList.add("is-open");
+      return;
+    }
+    /* telegram saved but trade link missing → purchase stays blocked: open the
+       profile (the same place the telegram lives) focused on the trade field */
+    showToast(t("tTradeMissing"), true);
+    openProfile();
   }
   function closeReq() {
     reqModal.classList.remove("is-open");
@@ -1457,14 +1507,21 @@ if (profileModal) {
         msgBody.push(`\n🏷️ ${t("couponOff")} (${appliedCoupon.code}): -${twoFix(discountAmt)} ${unitTxt()}`);
       }
       msgBody.push(`\nTotal: ${twoFix(total)} ${unitTxt()}`);
+      const trade = getTrade();
+      if (trade) msgBody.push(`\n${t("tradeMsgLbl")} ${trade}`);
       const newOrder = {
         id: Date.now(),
-        items: cart.map(n => {
-          const s = findSkin(n);
-          return s
-            ? { name: n, price: skinFinalPrice(s), img: s.img, rarity: s.rarity, weapon: s.weapon, wear: s.wear, type: s.type }
-            : { name: n, price: 0, img: "", rarity: "", weapon: "", wear: "", type: "" };
-        }),
+        items: [
+          ...cart.map(n => {
+            const s = findSkin(n);
+            return s
+              ? { name: n, price: skinFinalPrice(s), img: s.img, rarity: s.rarity, weapon: s.weapon, wear: s.wear, type: s.type }
+              : { name: n, price: 0, img: "", rarity: "", weapon: "", wear: "", type: "" };
+          }),
+          /* special items ride inside `items` (same as receipt/coupon): no DB
+             column needed, inventory-add skips them via the !it.special filter */
+          ...(trade ? [{ special: "trade", link: trade }] : []),
+        ],
         total,
         telegram: tg,
         date: new Date().toISOString(),

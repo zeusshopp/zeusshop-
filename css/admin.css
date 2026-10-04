@@ -889,6 +889,20 @@ body.admin {
   content: ""; width: 7px; height: 7px; border-radius: 50%;
   background: var(--green); box-shadow: 0 0 8px var(--green);
 }
+.order-row__trade {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: .76rem; margin-top: 6px;
+}
+.order-row__trade-lbl {
+  color: var(--muted); font-weight: 700;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.order-row__trade-link {
+  color: var(--accent); font-weight: 700; text-decoration: none;
+  font-family: var(--font-en); direction: ltr; unicode-bidi: embed;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.order-row__trade-link:hover { text-decoration: underline; }
 .order-row__foot {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   padding-top: 12px;
