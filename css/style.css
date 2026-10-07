@@ -2235,8 +2235,8 @@ html:has(body.login) { overflow: auto; }
 }
 .corner__item:hover { transform: translateX(-3px); border-color: rgba(240,194,75,.75); box-shadow: 0 12px 30px rgba(0,0,0,.6), 0 0 22px rgba(240,194,75,.3); }
 .corner__item:active { transform: scale(.97); }
-.corner__item--tg { border-color: rgba(42,171,238,.5); }
-.corner__item--tg:hover { border-color: rgba(42,171,238,.95); box-shadow: 0 12px 30px rgba(0,0,0,.6), 0 0 22px rgba(42,171,238,.4); }
+.corner__item--tg { border-color: rgba(240,194,75,.5); }
+.corner__item--tg:hover { border-color: rgba(240,194,75,.95); box-shadow: 0 12px 30px rgba(0,0,0,.6), 0 0 22px rgba(240,194,75,.4); }
 .corner__ico {
   width: 26px; height: 26px; flex: 0 0 auto;
   display: grid; place-items: center; border-radius: 50%;
@@ -2244,8 +2244,9 @@ html:has(body.login) { overflow: auto; }
   color: var(--accent);
 }
 .corner__ico--tg {
-  background: #2AABEE; color: #fff;
-  box-shadow: 0 0 6px rgba(42,171,238,.8), 0 0 14px rgba(42,171,238,.5);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #241a00;
+  box-shadow: 0 0 6px rgba(240,194,75,.8), 0 0 14px rgba(240,194,75,.5);
 }
 
 /* ===== RULES PAGE (full-screen) — same BLACK + GOLD theme as the site ===== */
