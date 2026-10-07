@@ -1490,6 +1490,194 @@ const tog = e.target.closest("[data-cp-toggle]");
     });
   }
 
+  /* ---------- shop rules: add / edit / delete / reorder ---------- */
+  const ruleList = $id("ruleList");
+  const ruleFormCard = $id("ruleFormCard");
+  const ruleFormTitle = $id("ruleFormTitle");
+  const ruleTitleInp = $id("ruleTitleInp"), ruleTextInp = $id("ruleTextInp");
+  const ruleSaveBtn = $id("ruleSave"), ruleCancelBtn = $id("ruleCancel"), ruleAddBtn = $id("ruleAddBtn");
+  const ruleSearch = $id("ruleSearch");
+  const rulesCount = $id("rulesCount");
+  const ruleTitleCount = $id("ruleTitleCount"), ruleTitleBar = $id("ruleTitleBar");
+  const ruleTextCount = $id("ruleTextCount"), ruleTextBar = $id("ruleTextBar");
+  const rulePreview = $id("rulePreview"), rulePreviewNum = $id("rulePreviewNum");
+  const rulePreviewTitle = $id("rulePreviewTitle"), rulePreviewText = $id("rulePreviewText");
+  let ruleEditIdx = -1;                       /* -1 = "add new" mode */
+
+  const RULE_ICONS = {
+    up: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+    down: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>',
+    edit: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
+    del: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>'
+  };
+  const rulesGet = () => (typeof getRules === "function" ? getRules() : []);
+  const rulesPersist = list => {
+    if (typeof saveRules === "function") saveRules(list);
+    rulesRender();
+    ruleSyncUI();
+  };
+
+  /* live counters + preview that mirrors the shop's rule card */
+  function ruleSyncUI() {
+    const tl = ruleTitleInp ? ruleTitleInp.value.length : 0;
+    const xl = ruleTextInp ? ruleTextInp.value.length : 0;
+    if (ruleTitleCount) ruleTitleCount.textContent = showNum(tl) + " / 140";
+    if (ruleTextCount) ruleTextCount.textContent = showNum(xl) + " / 700";
+    if (ruleTitleBar) ruleTitleBar.style.width = Math.min(100, (tl / 140) * 100) + "%";
+    if (ruleTextBar) ruleTextBar.style.width = Math.min(100, (xl / 700) * 100) + "%";
+    if (!rulePreview) return;
+    const title = ruleTitleInp ? ruleTitleInp.value.trim() : "";
+    const text = ruleTextInp ? ruleTextInp.value.trim() : "";
+    const show = !!(title || text) && !!ruleFormCard && !ruleFormCard.hidden;
+    rulePreview.hidden = !show;
+    if (!show) return;
+    const n = ruleEditIdx >= 0 ? ruleEditIdx + 1 : rulesGet().length + 1;
+    if (rulePreviewNum) rulePreviewNum.textContent = showNum(n);
+    if (rulePreviewTitle) rulePreviewTitle.textContent = title;
+    if (rulePreviewText) { rulePreviewText.textContent = text; rulePreviewText.hidden = !text; }
+  }
+
+  function rulesRender() {
+    if (!ruleList) return;
+    const arr = rulesGet();
+    const q = ((ruleSearch && ruleSearch.value) || "").trim().toLowerCase();
+    const view = arr
+      .map((r, i) => ({ r, i }))
+      .filter(o => !q || (o.r.t + " " + o.r.d).toLowerCase().indexOf(q) >= 0);
+    if (rulesCount) {
+      rulesCount.textContent = q
+        ? "(" + showNum(view.length) + " / " + showNum(arr.length) + ")"
+        : "(" + showNum(arr.length) + ")";
+    }
+    if (!arr.length) {
+      ruleList.innerHTML = '<p class="rule-empty">' + esc(FA("هنوز قانونی ثبت نشده؛ از دکمه «افزودن قانون» شروع کنید.", "No rules yet — hit “Add rule” to start.")) + "</p>";
+      return;
+    }
+    if (!view.length) {
+      ruleList.innerHTML = '<p class="rule-empty">' + esc(FA("قانونی با این جستجو پیدا نشد.", "No rule matches your search.")) + "</p>";
+      return;
+    }
+    ruleList.innerHTML = view.map(o => {
+      const i = o.i, r = o.r;
+      return `
+      <div class="rule-row${i === ruleEditIdx ? " is-editing" : ""}" data-i="${i}">
+        <div class="rule-row__main">
+          <span class="rule-row__num">${showNum(i + 1)}</span>
+          <div class="rule-row__txt">
+            <b>${esc(r.t || "—")}</b>
+            ${r.d ? `<span>${esc(r.d)}</span>` : ""}
+          </div>
+        </div>
+        <div class="rule-row__side">
+          <button type="button" class="rule-act" data-act="up" title="${FA("انتقال به بالا", "Move up")}" ${i === 0 ? "disabled" : ""}>${RULE_ICONS.up}</button>
+          <button type="button" class="rule-act" data-act="down" title="${FA("انتقال به پایین", "Move down")}" ${i === arr.length - 1 ? "disabled" : ""}>${RULE_ICONS.down}</button>
+          <button type="button" class="rule-act" data-act="edit" title="${FA("ویرایش", "Edit")}">${RULE_ICONS.edit}</button>
+          <button type="button" class="rule-act rule-act--del" data-act="del" title="${FA("حذف", "Delete")}">${RULE_ICONS.del}</button>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function rulesFormOpen(idx) {
+    if (!ruleFormCard) return;
+    ruleEditIdx = typeof idx === "number" && idx >= 0 ? idx : -1;
+    ruleFormCard.hidden = false;
+    if (ruleFormTitle) {
+      /* keep applyLang() in sync: only the add-mode title carries data-i18n */
+      if (ruleEditIdx < 0) ruleFormTitle.setAttribute("data-i18n", "admRuleAddTitle");
+      else ruleFormTitle.removeAttribute("data-i18n");
+      ruleFormTitle.textContent = t(ruleEditIdx < 0 ? "admRuleAddTitle" : "admRuleEditTitle");
+    }
+    const r = ruleEditIdx >= 0 ? rulesGet()[ruleEditIdx] : null;
+    if (ruleTitleInp) ruleTitleInp.value = r ? r.t : "";
+    if (ruleTextInp) ruleTextInp.value = r ? r.d : "";
+    rulesRender();                            /* highlight the row being edited */
+    ruleSyncUI();
+    ruleFormCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (ruleTitleInp) ruleTitleInp.focus();
+  }
+  function rulesFormClose() {
+    if (ruleFormCard) ruleFormCard.hidden = true;
+    ruleEditIdx = -1;
+    if (ruleTitleInp) ruleTitleInp.value = "";
+    if (ruleTextInp) ruleTextInp.value = "";
+    rulesRender();
+    ruleSyncUI();
+  }
+
+  if (ruleAddBtn) ruleAddBtn.addEventListener("click", () => rulesFormOpen(-1));
+  if (ruleCancelBtn) ruleCancelBtn.addEventListener("click", rulesFormClose);
+  /* live counters/preview while typing; live filtering while searching */
+  if (ruleTitleInp) ruleTitleInp.addEventListener("input", ruleSyncUI);
+  if (ruleTextInp) ruleTextInp.addEventListener("input", ruleSyncUI);
+  if (ruleSearch) ruleSearch.addEventListener("input", rulesRender);
+  /* Ctrl/⌘+Enter saves straight from inside the form */
+  [ruleTitleInp, ruleTextInp].forEach(el => {
+    if (!el) return;
+    el.addEventListener("keydown", e => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        if (ruleSaveBtn) ruleSaveBtn.click();
+      }
+    });
+  });
+  /* Esc closes the editor (only while it is open) */
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape" || !ruleFormCard || ruleFormCard.hidden) return;
+    rulesFormClose();
+  });
+  if (ruleSaveBtn) ruleSaveBtn.addEventListener("click", () => {
+    const title = (ruleTitleInp ? ruleTitleInp.value : "").trim();
+    const text = (ruleTextInp ? ruleTextInp.value : "").trim();
+    if (!title && !text) {
+      showToast(FA("عنوان یا متن قانون را وارد کنید", "Enter a rule title or text"), true);
+      if (ruleTitleInp) ruleTitleInp.focus();
+      return;
+    }
+    const arr = rulesGet();
+    if (ruleEditIdx >= 0 && ruleEditIdx < arr.length) arr[ruleEditIdx] = { t: title, d: text };
+    else arr.push({ t: title, d: text });
+    rulesPersist(arr);
+    rulesFormClose();
+    showToast(FA("قانون ذخیره شد ✓", "Rule saved ✓"));
+  });
+
+  if (ruleList) ruleList.addEventListener("click", e => {
+    const btn = e.target && e.target.closest ? e.target.closest("[data-act]") : null;
+    if (!btn || !ruleList.contains(btn)) return;
+    const row = btn.closest(".rule-row");
+    if (!row) return;
+    const i = +row.dataset.i;
+    const arr = rulesGet();
+    const act = btn.dataset.act;
+    if (act === "edit") { rulesFormOpen(i); return; }
+    if (act === "del") {
+      if (!confirm(FA("این قانون حذف شود؟", "Delete this rule?"))) return;
+      arr.splice(i, 1);
+      if (ruleEditIdx === i) rulesFormClose();
+      else if (ruleEditIdx > i) ruleEditIdx--;
+      rulesPersist(arr);
+      showToast(FA("قانون حذف شد ✓", "Rule deleted ✓"));
+      return;
+    }
+    if (act === "up" || act === "down") {
+      const j = act === "up" ? i - 1 : i + 1;
+      if (j < 0 || j >= arr.length) return;
+      const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+      rulesPersist(arr);
+      showToast(FA("ترتیب قوانین ذخیره شد ✓", "Rule order saved ✓"));
+    }
+  });
+
+  /* stay in sync when rules change from another session */
+  document.addEventListener("zeus-db", e => {
+    if ((e.detail && e.detail.type) !== "settings") return;
+    rulesRender();
+    ruleSyncUI();
+  });
+  rulesRender();
+  ruleSyncUI();
+
   /* ---------- payment card settings ---------- */
   const payCard = $id("payCard");
   const payHolder = $id("payHolder");

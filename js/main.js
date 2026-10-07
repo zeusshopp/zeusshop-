@@ -63,6 +63,19 @@ const I18N = {
     fLegal: "قوانین", fTerms: "قوانین استفاده", fPrivacy: "حریم خصوصی", fRefund: "بازگشت وجه",
     footerCr: "© 2026 ZEUSSHOP. وابسته به Valve نیست.",
     footerPay: "تحویل از طریق تلگرام / استیم",
+    fabRules: "قوانین ZEUSSHOP", fabTg: "پشتیبانی تلگرام",
+    rulesTitle: "قوانین ZEUSSHOP",
+    rulesEmpty: "هنوز قانونی ثبت نشده است.",
+    admRulesNav: "قوانین", admRulesTitle: "مدیریت قوانین سایت",
+    admRulesNote: "قوانینی که کاربران در صفحه «قوانین» سایت می‌بینند؛ بلافاصله پس از ذخیره روی سایت اعمال می‌شود.",
+    admRulesListTitle: "قوانین فعلی سایت",
+    admRuleAdd: "افزودن قانون", admRuleAddTitle: "قانون جدید", admRuleEditTitle: "ویرایش قانون",
+    admRuleTitleLbl: "عنوان قانون", admRuleTextLbl: "متن قانون",
+    admRuleTitlePh: "مثلاً: قانون ۱ — عدم امکان لغو بعد از خرید",
+    admRuleTextPh: "متن کامل قانون…",
+    admRuleSave: "ذخیره قانون", admRuleCancel: "انصراف",
+    admRulePreview: "پیش‌نمایش — دقیقاً همان‌طور که در سایت دیده می‌شود",
+    admRuleSearchPh: "جستجو در قوانین…",
     cartTitle: "سبد خرید", cartEmpty: "سبد خرید شما خالی است.", cartTotal: "جمع کل", cartCheckout: "نهایی‌کردن خرید",
     couponPh: "کد تخفیف (اختیاری)", couponApply: "اعمال", couponOk: "کد تخفیف اعمال شد ✓", couponOff: "تخفیف",
     couponErrNF: "کد تخفیف پیدا نشد.", couponErrUsed: "این کد قبلاً استفاده شده یا مخصوص شما نیست.", couponErrElse: "این کد مخصوص کاربر دیگری است.",
@@ -103,6 +116,8 @@ const I18N = {
     payDropSub: "عکس فیش — روی کادر بزن یا بکش و رها کن",
     payDropBad: "فقط عکس انتخاب کن.",
     payDropBig: "حجم عکس خیلی زیاد است (حداکثر ۸ مگابایت).",
+    payConsentTxt: "من به تمام قوانین ZEUSSHOP آگاه هستم و رضایت کامل دارم.",
+    payConsentMsg: "برای ثبت نهایی، ابتدا تأیید قوانین را بزنید.",
     paySubmit: "ثبت فیش و دریافت کد پیگیری",
     payTrackLbl: "کد پیگیری:",
     payOkTitle: "پرداخت ثبت شد 🎉",
@@ -209,6 +224,8 @@ const I18N = {
     payDropSub: "Receipt photo — tap or drag & drop",
     payDropBad: "Please choose an image.",
     payDropBig: "Image is too large (max 8 MB).",
+    payConsentTxt: "I am fully aware of all ZEUSSHOP rules and fully consent to them.",
+    payConsentMsg: "Accept the rules first to complete your order.",
     paySubmit: "Upload receipt & get tracking code",
     payTrackLbl: "Tracking code:",
     payOkTitle: "Payment received 🎉",
@@ -237,6 +254,19 @@ navInv: "Inventory", invTitle: "My Inventory", invEmptyTitle: "No items in your 
     invBack: "Back to market",
     annTitle: "Shop Announcement", annOk: "Got it ✓",
     latestLabel: "Recent Approved Purchases",
+    fabRules: "ZEUSSHOP Rules", fabTg: "Telegram Support",
+    rulesTitle: "ZEUSSHOP Rules",
+    rulesEmpty: "No rules have been added yet.",
+    admRulesNav: "Rules", admRulesTitle: "Site rules manager",
+    admRulesNote: "The rules visitors see on the shop's Rules page; applied live as soon as you save.",
+    admRulesListTitle: "Current rules",
+    admRuleAdd: "Add rule", admRuleAddTitle: "New rule", admRuleEditTitle: "Edit rule",
+    admRuleTitleLbl: "Rule title", admRuleTextLbl: "Rule text",
+    admRuleTitlePh: "e.g. Rule 1 — No cancellations after purchase",
+    admRuleTextPh: "Full rule text…",
+    admRuleSave: "Save rule", admRuleCancel: "Cancel",
+    admRulePreview: "Preview — exactly as it looks on the site",
+    admRuleSearchPh: "Search rules…",
   },
 };
 
@@ -1309,6 +1339,8 @@ if (profileModal) {
   const payPrev = $id("payPrev");
   const payClear = $id("payClear");
   const paySubmit = $id("paySubmit");
+  const payConsent = $id("payConsent");
+  const payConsentWrap = $id("payConsentWrap");
   const payCode = $id("payCode");
   const copyCodeBtn = $id("copyCode");
   const payDone = $id("payDone");
@@ -1346,6 +1378,9 @@ if (profileModal) {
     if (payPrev) payPrev.removeAttribute("src");
     if (payPrevWrap) payPrevWrap.hidden = true;
     if (paySubmit) paySubmit.disabled = true;
+    /* consent checkbox starts fresh on every order */
+    if (payConsent) payConsent.checked = false;
+    if (payConsentWrap) payConsentWrap.classList.remove("is-ok", "is-shake");
     if (payStep1) payStep1.hidden = false;
     if (payStep2) payStep2.hidden = true;
     if (payCode) payCode.textContent = "---";
@@ -1418,6 +1453,13 @@ if (profileModal) {
     if (payPrevWrap) payPrevWrap.hidden = true;
     if (paySubmit) paySubmit.disabled = true;
   });
+  /* consent: highlight when ticked, drop the shake state on change */
+  if (payConsent && payConsentWrap) {
+    payConsent.addEventListener("change", () => {
+      payConsentWrap.classList.toggle("is-ok", payConsent.checked);
+      payConsentWrap.classList.remove("is-shake");
+    });
+  }
   const closePayEls = [payOverlay, $id("closePay"), payDone];
   closePayEls.forEach(el => { if (el) el.addEventListener("click", closePayModal); });
   document.addEventListener("keydown", e => {
@@ -1443,6 +1485,16 @@ if (profileModal) {
     const flow = payFlow;
     if (!flow || !flow.newOrder) return;
     if (!payDataUrl) { showToast(t("payDropBad"), true); return; }
+    /* rules consent is mandatory before the order can be registered */
+    if (payConsent && !payConsent.checked) {
+      if (payConsentWrap) {
+        payConsentWrap.classList.remove("is-shake");
+        void payConsentWrap.offsetWidth;      /* restart the shake */
+        payConsentWrap.classList.add("is-shake");
+      }
+      showToast(t("payConsentMsg"), true);
+      return;
+    }
     const tg = flow.tg;
     const CD_MS = 30000;
     paySubmit.disabled = true;
@@ -2200,13 +2252,14 @@ if (profileModal) {
     try { renderCart(); } catch { /* ignore */ }
     if (typeof refreshHero === "function") refreshHero();
     try { renderLatest(); } catch { /* ignore */ }
+    try { renderRules(); } catch { /* ignore */ }
     if (raffleSync) raffleSync();
   });
   document.addEventListener("zeus-db", e => {
     const type = (e.detail && e.detail.type) || "";
     if (type === "catalog") { if (typeof globalState === "function") globalState(); if (typeof refreshHero === "function") refreshHero(); }
     if (type === "announcement") { try { renderAnnouncement(); } catch { /* ignore */ } }
-    if (type === "settings") { if (typeof globalState === "function") globalState(); if (typeof applyHeroImg === "function") applyHeroImg(); if (raffleSync) raffleSync(); }
+    if (type === "settings") { if (typeof globalState === "function") globalState(); if (typeof applyHeroImg === "function") applyHeroImg(); if (raffleSync) raffleSync(); try { renderRules(); } catch { /* ignore */ } }
     if (type === "orders") { try { renderLatest(); } catch { /* ignore */ } }
     if (type === "users") { if (typeof refreshHero === "function") refreshHero(); }
     if (type === "inventory" && typeof document !== "undefined" && document.body.classList.contains("is-inv") && typeof renderUserInventory === "function") {
@@ -2242,5 +2295,82 @@ const revealIO = new IntersectionObserver(entries => {
   entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add("is-in"); revealIO.unobserve(en.target); } });
 }, { threshold: .1 });
 document.querySelectorAll(".reveal").forEach(el => revealIO.observe(el));
+
+/* =========================================================
+   Shop rules page — list rendered from site_settings["rules"]
+   (admin-editable; defaults live in db.js DEFAULT_RULES)
+   ========================================================= */
+function renderRules() {
+  const box = $id("rulesList");
+  if (!box || typeof getRules !== "function") return;
+  const rules = getRules();
+  if (!rules.length) {
+    box.innerHTML = '<p class="rules-empty"></p>';
+    box.firstChild.textContent = t("rulesEmpty");
+    return;
+  }
+  /* numbered badges + a staggered fade-in as the page opens */
+  box.innerHTML = rules.map((r, i) =>
+    '<div class="rule" style="animation-delay:' + Math.min(i * 45, 540) + 'ms">' +
+      '<span class="rule__num">' + showNum(i + 1) + "</span>" +
+      '<div class="rule__body"><b>' + escT(r.t) + "</b>" + (r.d ? "<p>" + escT(r.d) + "</p>" : "") + "</div>" +
+    "</div>"
+  ).join("");
+}
+
+/* =========================================================
+   Corner floating menu (rules page + telegram support)
+   ========================================================= */
+(function cornerMenu() {
+  const fab = $id("cornerFab"), menu = $id("cornerMenu"), rulesBtn = $id("cornerRulesBtn");
+  const rulesPage = $id("rulesPage"), rulesCloseX = $id("rulesCloseX");
+  if (!fab || !menu) return;
+
+  function closeMenu() {
+    menu.classList.remove("is-open");
+    fab.classList.remove("is-open");
+    fab.setAttribute("aria-expanded", "false");
+  }
+  function closeRules() {
+    if (!rulesPage) return;
+    rulesPage.classList.remove("show");
+    rulesPage.setAttribute("aria-hidden", "true");
+  }
+
+  fab.addEventListener("click", e => {
+    e.stopPropagation();
+    const open = !menu.classList.contains("is-open");
+    menu.classList.toggle("is-open", open);
+    fab.classList.toggle("is-open", open);
+    fab.setAttribute("aria-expanded", String(open));
+  });
+  /* tap outside the corner closes the menu */
+  document.addEventListener("click", e => {
+    if (!menu.classList.contains("is-open")) return;
+    if (e.target && e.target.closest && e.target.closest("#corner")) return;
+    closeMenu();
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape") return;
+    if (rulesPage && rulesPage.classList.contains("show")) closeRules();
+    else closeMenu();
+  });
+
+  if (rulesBtn) rulesBtn.addEventListener("click", () => {
+    closeMenu();
+    if (!rulesPage) return;
+    rulesPage.classList.add("show");
+    rulesPage.setAttribute("aria-hidden", "false");
+    rulesPage.scrollTop = 0;
+  });
+  /* any other menu item (telegram link) closes the menu after being tapped */
+  menu.querySelectorAll(".corner__item").forEach(el => {
+    if (el === rulesBtn) return;
+    el.addEventListener("click", closeMenu);
+  });
+  if (rulesCloseX) rulesCloseX.addEventListener("click", closeRules);
+})();
+
+try { renderRules(); } catch { /* ignore */ }
 
 applyLang();
