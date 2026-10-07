@@ -470,9 +470,22 @@ function addUser(tg) {
      right, so it still passes the public-only INSERT policy. */
   if (DB_MODE) dbOnReady(function () {
     const isDup = e => /duplicate|unique|users_tg_key/i.test(String((e && e.message) || e || ""));
+    /* An RLS rejection on this telemetry table must NOT scare the customer:
+       profile (telegram/trade) is already saved locally and the shop works —
+       only the server-side "active users" stat is skipped. Console-only, so
+       the admin still sees it (fix = run the users public insert policy). */
+    const isRls = e => /row-level security/i.test(String((e && e.message) || e || ""));
+    const report = e => {
+      if (isDup(e)) return;
+      if (isRls(e)) {
+        console.error("ZEUSSHOP: users insert blocked by RLS — run the \"users public insert\" policy in Supabase:", (e && e.message) || e);
+        return;
+      }
+      dbLog(e);
+    };
     supa.from("users").upsert([{ id: id, tg, date: new Date().toISOString() }], { onConflict: "tg", ignoreDuplicates: true })
-      .then(r => { if (r.error && !isDup(r.error)) dbLog(r.error); })
-      .catch(e => { if (!isDup(e)) dbLog(e); });
+      .then(r => { if (r.error) report(r.error); })
+      .catch(report);
   });
   dbNotify({ type: "users" });
 }
