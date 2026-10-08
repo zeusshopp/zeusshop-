@@ -372,6 +372,9 @@ if (adminMain) {
     const discVal = parseInt(tfDiscount.value, 10);
     const discount = discOn ? Math.max(0, Math.min(99, isNaN(discVal) ? 25 : discVal)) : 0;
 
+    /* skins.created_at is NOT NULL in the DB — a new key needs one too
+       (this omission is what made «افزودن کلید» fail with a not-null error) */
+    const prevTf2 = tf2Editing ? findSkin(tf2Editing) : null;
     const obj = {
       name: name,
       img: tf2ImgData || (tf2Editing ? (findSkin(tf2Editing) || {}).img : ""),
@@ -383,6 +386,7 @@ if (adminMain) {
       discount: discount,
       delivery_mode: "immediate",
       delivery_days: 0,
+      created_at: (prevTf2 && prevTf2.created_at) ? prevTf2.created_at : new Date().toISOString(),
     };
 
     let custom = getCustom();
@@ -1904,6 +1908,8 @@ async function wipeAndRestoreTable(supa, t, rows) {
         c[k] = r[k];
       }
     });
+    /* created_at is NOT NULL in skins/inventory — restore never sends null/missing */
+    if ((t === "skins" || t === "inventory") && !c.created_at) c.created_at = new Date().toISOString();
     return c;
   });
   const ins = await supa.from(t).upsert(clean, { onConflict: t === "site_settings" ? "key" : "id" });

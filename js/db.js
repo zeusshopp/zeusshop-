@@ -719,7 +719,8 @@ function dbSyncCatalog(list, goneNames) {
     float: s.float == null ? null : Number(s.float),
     delivery_mode: s.delivery_mode === "days" ? "days" : "immediate",
     delivery_days: Math.max(0, Math.min(30, Math.round(Number(s.delivery_days) || 0))),
-    created_at: s.created_at || undefined,
+    /* skins.created_at is NOT NULL without default — never send null/undefined */
+    created_at: s.created_at || new Date().toISOString(),
   }));
   const gone = Array.isArray(goneNames) ? goneNames : [];
   deltaDb("skins", rows, gone);
