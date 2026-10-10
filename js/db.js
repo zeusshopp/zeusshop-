@@ -1184,8 +1184,9 @@ function fetchRows(table) {
    `items` carries base64 receipt photos → a full orders fetch measured ~1.5 MB.
    Polled every 4 s by the panel that alone burned ~32 GB/day and blew the
    Supabase free egress quota (14.9/5 GB = 299%!). Polls now read only this
-   light line (~1 KB per order, no photos). */
-const ORDERS_LITE_COLS = "id,telegram,total,status,date,coupon,created_at";
+   light line (~1 KB per order, no photos). Note: no created_at here on purpose
+   — the orders table (old and new) doesn't need it and the id is the timestamp. */
+const ORDERS_LITE_COLS = "id,telegram,total,status,date,coupon";
 function fetchOrdersLite() {
   return new Promise(resolve => {
     let done = false;
