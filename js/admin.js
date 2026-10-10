@@ -1974,3 +1974,76 @@ if (restoreBtn && restoreFile) {
     }
   });
 }
+
+/* ---------- slim old receipts (one-time: re-shrink stored base64 photos) ----------
+   Orders used to store ~300 KB receipts → the orders query measured ~1.5 MB for
+   just 5 orders (and was the egress bomb: 14.9/5 GB Supabase quota!). Polls now
+   read only a light metadata line, but the BOOT fetch still pulls every order's
+   photos once — this action rewrites the stored receipts with the same
+   1000px/q.62 shrink the checkout now uses, so that boot download (and every
+   per-order photo fetch) shrinks several-fold too. */
+function compressReceiptData(dataUrl) {
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (!w || !h) return res(dataUrl);
+      if (w > 1000) { h = Math.round(h * 1000 / w); w = 1000; }
+      try {
+        const cv = document.createElement("canvas");
+        cv.width = w; cv.height = h;
+        cv.getContext("2d").drawImage(img, 0, 0, w, h);
+        const out = cv.toDataURL("image/webp", .62);
+        res((!out || out.length >= dataUrl.length) ? dataUrl : out);
+      } catch { res(dataUrl); }
+    };
+    img.onerror = () => res(dataUrl);
+    img.src = dataUrl;
+  });
+}
+const slimBtn = $id("slimBtn");
+if (slimBtn) {
+  slimBtn.addEventListener("click", async () => {
+    if (!dbReadyNow()) {
+      showToast(lang === "fa" ? "سبک‌سازی فقط در حالت دیتابیس فعال است." : "Slimming works only in DB mode.", true);
+      return;
+    }
+    const ok = window.confirm(lang === "fa"
+      ? "رسیدهای قدیمی سفارش‌ها دوباره فشرده شوند؟ حجم دیتابیس، مصرف اینترنت و سرعت پنل چند برابر بهتر می‌شود."
+      : "Recompress the stored receipts? This shrinks the database, bandwidth use and speeds up the panel.");
+    if (!ok) return;
+    slimBtn.disabled = true;
+    try {
+      const orders = getOrders();
+      let doneCnt = 0, freed = 0;
+      for (const o of orders) {
+        const items = Array.isArray(o.items) ? o.items : [];
+        let dirty = false;
+        const next = [];
+        for (let it of items) {
+          if (it && it.special === "receipt" && typeof it.img === "string" && it.img.length > 100 * 1024) {
+            const small = await compressReceiptData(it.img);
+            if (small && small.length < it.img.length) {
+              freed += it.img.length - small.length;
+              it = Object.assign({}, it, { img: small });
+              dirty = true;
+            }
+          }
+          next.push(it);
+        }
+        if (dirty) { dbUpdateOrderItems(o.id, next); doneCnt++; }
+      }
+      showToast(doneCnt
+        ? (lang === "fa"
+            ? "سبک‌سازی شد ✓ — " + doneCnt + " سفارش، " + Math.round(freed / 1024) + " کیلوبایت آزاد شد"
+            : "Slimmed ✓ — " + doneCnt + " orders, " + Math.round(freed / 1024) + " KB freed")
+        : (lang === "fa" ? "چیزی برای سبک‌سازی نبود ✓" : "Nothing to slim ✓"));
+      try { renderAll(); } catch { /* ignore */ }
+    } catch (err) {
+      dbLog(err);
+      showToast(lang === "fa" ? "خطا در سبک‌سازی." : "Slimming failed.", true);
+    } finally {
+      slimBtn.disabled = false;
+    }
+  });
+}

@@ -99,6 +99,10 @@ const K_SET = "skm_set_db";        // site settings mirror (key → value)
 /* in-memory caches (authoritative in DB_MODE after ready) */
 let catCache = null;               // array | null
 let ordersCache = lsRawGet(K_ORD, []);
+/* which orders already had their `items` (base64 receipt photos) fetched — the
+   polls read only a light metadata line, so this map remembers which rows still
+   need their photo payload pulled (once), instead of re-downloading all of it */
+let ordItemsState = {};
 let invRowsCache = lsRawGet(K_INV, []);
 let usersCache = lsRawGet(K_USR, []);
 let userCountCache = null;         // fallback count (RPC) when anonymous RLS hides the users table
@@ -508,7 +512,8 @@ function addUser(tg) {
      used to throw duplicate key "users_tg_key" and toast a scary save error.
      Prefer: resolution=ignore-duplicates → ON CONFLICT DO NOTHING needs no UPDATE
      right, so it still passes the public-only INSERT policy. */
-  if (DB_MODE) dbOnReady(function () {
+  if (DB_MODE) dbRevive(6000).then(function () {
+    if (!(DB_READY && supa)) return;
     const isDup = e => /duplicate|unique|users_tg_key/i.test(String((e && e.message) || e || ""));
     /* An RLS rejection on this telemetry table must NOT scare the customer:
        profile (telegram/trade) is already saved locally and the shop works —
@@ -533,16 +538,13 @@ function placeOrder(o) {
   const row = normOrder(o);
   ordersCache = [...(Array.isArray(ordersCache) ? ordersCache : []).filter(x => x.id !== row.id), row];
   lsSet(K_ORD, ordersCache);
-  /* insert-only on the public shop: pending orders must reach the DB for the admin to approve */
-  if (DB_MODE) dbOnReady(function () {
-    const payBase = { id: row.id, telegram: row.telegram, items: row.items, total: row.total, status: row.status, date: row.date };
-    const tryInsert = (payload, cb) => {
-      /* this client build ignores onConflict on .insert() — .upsert() honors it.
-         ignoreDuplicates → ON CONFLICT DO NOTHING (no UPDATE right needed), so a
-         repeated/same-millisecond order id can never crash the checkout. */
-      supa.from("orders").upsert([payload], { onConflict: "id", ignoreDuplicates: true })
-        .then(r => { if (r.error) cb(r.error); }).catch(cb);
-    };
+  /* insert-only on the public shop: pending orders must reach the DB for the admin to approve.
+     The connection is revived first (bounded wait) — a checkout made while the DB was
+     unreachable must fail LOUDLY. Before this fix it was queued into dbOnReady, which
+     never flushed while supa was null: the customer's order silently died in their
+     own browser and "the admin sees no orders" was born. */
+  if (DB_MODE) (async () => {
+    if (!(DB_READY && supa)) await dbRevive(7000);
     /* final-attempt failure: the order exists ONLY in this browser, the admin
        will never see it — say so loudly (RLS checkout_allowed also rejects when
        the buyer already has 3 pending orders, and the panel can't guess that). */
@@ -554,6 +556,15 @@ function placeOrder(o) {
           : "⚠️ Order did NOT reach the database — the admin cannot see it! Send your tracking code to the admin on Telegram.", true);
       } catch { /* ignore */ }
       dbNotify({ type: "orders" });
+    };
+    if (!(DB_READY && supa)) { orderInsertFailed(new Error("database unreachable")); return; }
+    const payBase = { id: row.id, telegram: row.telegram, items: row.items, total: row.total, status: row.status, date: row.date };
+    const tryInsert = (payload, cb) => {
+      /* this client build ignores onConflict on .insert() — .upsert() honors it.
+         ignoreDuplicates → ON CONFLICT DO NOTHING (no UPDATE right needed), so a
+         repeated/same-millisecond order id can never crash the checkout. */
+      supa.from("orders").upsert([payload], { onConflict: "id", ignoreDuplicates: true })
+        .then(r => { if (r.error) cb(r.error); }).catch(cb);
     };
     if (row.coupon) {
       tryInsert({ ...payBase, coupon: row.coupon }, err => {
@@ -567,7 +578,20 @@ function placeOrder(o) {
     } else {
       tryInsert(payBase, orderInsertFailed);
     }
-  });
+  })();
+  dbNotify({ type: "orders" });
+}
+/* rewrite ONE order's items (used by the panel's "slim old receipts" action):
+   keeps id/status/total untouched — only the payload shrinks */
+function dbUpdateOrderItems(id, items) {
+  id = Number(id);
+  const row = (Array.isArray(ordersCache) ? ordersCache : []).find(x => x && x.id === id);
+  if (row) { row.items = items; lsSet(K_ORD, ordersCache); }
+  ordItemsState[id] = 1;
+  if (DB_MODE && supa) {
+    supa.from("orders").update({ items: items }).eq("id", id)
+      .then(r => { if (r.error) dbLog(r.error); }).catch(dbLog);
+  }
   dbNotify({ type: "orders" });
 }
 function deleteOrder(id) {
@@ -914,6 +938,37 @@ async function dbDeleteInventoryItem(row) {
 /* =========================================================
    Init — connect, load everything, broadcast "zeus-db-ready"
    ========================================================= */
+/* ---- self-healing: one flaky mobile request must not kill the whole session ----
+   Before this, a SINGLE failed skins/announcement fetch dropped the entire site
+   into silent local mode for the rest of the visit: the customer saw the DEFAULT
+   catalog (wrong prices), their checkout order only existed in their own browser
+   (admin saw nothing), and user registrations vanished. Now the shop retries the
+   critical tables a few times, and if it still fails it keeps quietly retrying
+   every 45 s in the background and switches to live mode BY ITSELF. */
+let dbHealTimer = null;
+function dbStopHealing() {
+  if (dbHealTimer) { clearInterval(dbHealTimer); dbHealTimer = null; }
+}
+function dbStartHealing() {
+  if (!DB_MODE || dbHealTimer) return;
+  dbHealTimer = setInterval(async () => {
+    if (DB_READY && supa) { dbStopHealing(); return; }
+    const ok = await dbInit();
+    if (ok) dbStopHealing();
+  }, 45000);
+}
+/* bounded wait for the DB to become usable — used before critical writes so a
+   checkout never gets silently dropped just because init hadn't finished yet */
+function dbRevive(ms) {
+  return new Promise(res => {
+    if (DB_READY && supa) return res(true);
+    let done = false;
+    const fin = v => { if (!done) { done = true; res(v); } };
+    dbInit().then(ok => fin(!!ok)).catch(() => fin(false));
+    setTimeout(() => fin(DB_READY && !!supa), Math.max(1000, Number(ms) || 8000));
+  });
+}
+let dbInitRunning = false;
 async function dbInit() {
   if (!DB_MODE) {
     heavyReady = true;
@@ -921,31 +976,44 @@ async function dbInit() {
     dbReady("local");
     return false;
   }
+  if (dbInitRunning) return DB_READY && !!supa;
+  dbInitRunning = true;
+  try { return await dbInitInner(); }
+  finally { dbInitRunning = false; }
+}
+async function dbInitInner() {
   if (!Array.isArray(catCache)) catCache = lsGet(K_CAT, []);
   try {
-    supa = supabaseLib.createClient(DB_URL, DB_KEY);
+    if (!supa) supa = supabaseLib.createClient(DB_URL, DB_KEY);
     /* orders/inventory start loading right away, in parallel with the critical
        tables — the "latest purchases" ticker then appears as fast as possible
        instead of waiting for the critical load to finish first */
     dbInitHeavy();
     /* critical / small tables first — the shop can render and the
        announcement can show as soon as these are in cache */
-    const crit = await Promise.all([
-      fetchRows("skins"),
-      fetchRows("announcement"),
-      fetchRows("site_settings"),
-    ]);
-    const [e1, d1] = crit[0];
-    const [e5, d5] = crit[1];
-    const [e6, d6] = crit[2];
+    let e1 = null, d1 = null, e5 = null, d5 = null, d6 = null;
+    for (let att = 0; att < 3; att++) {
+      const crit = await Promise.all([
+        fetchRows("skins"),
+        fetchRows("announcement"),
+        fetchRows("site_settings"),
+      ]);
+      e1 = crit[0][0]; d1 = crit[0][1];
+      e5 = crit[1][0]; d5 = crit[1][1];
+      d6 = crit[2][1];
+      if (!e1 && !e5) break;
+      if (att < 2) await new Promise(r => setTimeout(r, 2500));
+    }
 
     if (e1 || e5) {
-      /* skins / announcement table(s) missing — stay in fallback mode */
-      console.warn("ZEUSSHOP db: tables not ready yet — using local mode.", e1 || e5);
+      /* skins / announcement table(s) not answering — stay in fallback mode
+         and keep retrying quietly in the background (self-heal) */
+      console.warn("ZEUSSHOP db: tables not ready yet — local mode, will keep retrying.", e1 || e5);
       supa = null;
       heavyReady = true;
       DB_READY = true;
       dbReady("local");
+      dbStartHealing();
       return false;
     }
 
@@ -959,16 +1027,20 @@ async function dbInit() {
     lsSet(K_SET, setCache);
 
     DB_READY = true;
-    dbRealtime();
+    dbStopHealing();
+    /* restart (not stack) the channel: on a re-init the old one is removed
+       first, so heal/restore can't accumulate duplicate subscriptions */
+    dbRestartRealtime();
     dbReady("db");
     dbStartPolling();
     return true;
   } catch (err) {
-    console.warn("ZEUSSHOP db: init failed — local mode.", err);
+    console.warn("ZEUSSHOP db: init failed — local mode, will keep retrying.", err);
     supa = null;
     heavyReady = true;
     DB_READY = true;
     dbReady("local");
+    dbStartHealing();
     return false;
   }
 }
@@ -996,8 +1068,25 @@ async function dbInitHeavy() {
       }
     }
     /* notify each table the moment IT lands — the "latest purchases" ticker only
-       needs orders, so it must not wait for slower tables (inventory/users) */
-    const ordP = fetchRows("orders");
+       needs orders, so it must not wait for slower tables (inventory/users).
+       The orders payload is split on purpose (egress!): the light metadata line
+       always loads, but the base64 photos inside `items` are fetched only for
+       the rows this page actually shows — every order in the panel, and on the
+       shop only the newest approved ones (the ticker). */
+    const ordP = (async () => {
+      const [err, rows] = await fetchOrdersLite();
+      if (err || !Array.isArray(rows)) return [err, null];
+      const ids = IS_ADMIN_PAGE
+        ? rows.map(r => r.id)
+        : rows.filter(r => r.status === "approved")
+            .sort((a, b) => Number(b.id || 0) - Number(a.id || 0)).slice(0, 6).map(r => r.id);
+      const [e2i, irows] = await fetchOrderItems(ids);
+      const byId = {};
+      (Array.isArray(irows) ? irows : []).forEach(r => { byId[r.id] = r.items; });
+      ids.forEach(id => { ordItemsState[id] = 1; });
+      if (e2i) console.warn("ZEUSSHOP db: order photos failed to load — names/receipts appear on the next sync.", e2i);
+      return [null, rows.map(r => normOrder(Object.assign({}, r, { items: byId[r.id] || [] })))];
+    })();
     const invP = fetchRows("inventory");
     const usrP = IS_ADMIN_PAGE ? fetchRows("users") : null;
     const countP = (userCountCache === null || userCountCache === 0) ? fetchUserCount() : null;
@@ -1024,8 +1113,10 @@ async function dbInitHeavy() {
 
 const FETCH_TIMEOUT = 6000;
 /* heavy tables (orders carry base64 receipt photos → big payloads) get a longer
-   window: a timeout here means the admin list simply stays empty */
-const HEAVY_FETCH_TIMEOUT = 15000;
+   window: a timeout here means the admin list simply stays empty. The live
+   orders table measured ~1.5 MB — on a 4G phone that can take 20-30 s, so
+   15 s zeroed the panel out and "orders never come" was born. */
+const HEAVY_FETCH_TIMEOUT = 45000;
 
 /* ---------- change detection ----------
    cheap signatures protect pages from re-rendering (and images/requests
@@ -1089,6 +1180,37 @@ function fetchRows(table) {
   });
 }
 
+/* ---------- orders: split metadata / photos (egress defense) ----------
+   `items` carries base64 receipt photos → a full orders fetch measured ~1.5 MB.
+   Polled every 4 s by the panel that alone burned ~32 GB/day and blew the
+   Supabase free egress quota (14.9/5 GB = 299%!). Polls now read only this
+   light line (~1 KB per order, no photos). */
+const ORDERS_LITE_COLS = "id,telegram,total,status,date,coupon,created_at";
+function fetchOrdersLite() {
+  return new Promise(resolve => {
+    let done = false;
+    const fin = (err, data) => { if (!done) { done = true; resolve([err, data || []]); } };
+    const timer = setTimeout(() => fin(new Error("timeout: orders-lite")), FETCH_TIMEOUT);
+    supa.from("orders").select(ORDERS_LITE_COLS).limit(1000).order("id", { ascending: false })
+      .then(r => { clearTimeout(timer); fin(r.error, r.data); })
+      .catch(e => { clearTimeout(timer); fin(e, null); });
+  });
+}
+/* photos (`items`) for SPECIFIC orders only — at boot for the rows the page
+   shows, and on polls only for orders that appeared or changed */
+function fetchOrderItems(ids) {
+  ids = (Array.isArray(ids) ? ids : []).map(Number).filter(Boolean);
+  if (!ids.length) return Promise.resolve([null, []]);
+  return new Promise(resolve => {
+    let done = false;
+    const fin = (err, data) => { if (!done) { done = true; resolve([err, data || []]); } };
+    const timer = setTimeout(() => fin(new Error("timeout: order-items")), HEAVY_FETCH_TIMEOUT);
+    supa.from("orders").select("id,items").in("id", ids).limit(1000)
+      .then(r => { clearTimeout(timer); fin(r.error, r.data); })
+      .catch(e => { clearTimeout(timer); fin(e, null); });
+  });
+}
+
 /* live updates: when anyone changes skins/orders, auto rebuild locals */
 let realtimeChannel = null;
 let realtimeSeq = 0;
@@ -1118,9 +1240,54 @@ function dbRealtime() {
    2 → 4 → 20). Chaining makes each snapshot start after the previous one
    applied, so the cache only ever moves forward. */
 const reloadChains = {};
+/* lite orders sync: the poll/realtime path for the orders table. Reads only the
+   metadata line, then pulls the photo payloads (`items`) of ONLY the orders that
+   are new here or whose status/total changed — everything else stays cached. */
+function dbSyncOrders(done) {
+  fetchOrdersLite().then(([err, rows]) => {
+    try {
+      if (err || !Array.isArray(rows)) return;
+      const prev = Array.isArray(ordersCache) ? ordersCache : [];
+      const prevById = {};
+      prev.forEach(o => { prevById[o.id] = o; });
+      /* photos are refetched when: the order is new to us, its status/total
+         changed (approve/reject), or we never managed to fetch them yet */
+      const stale = rows.filter(r => {
+        const p = prevById[r.id];
+        return !p || !ordItemsState[r.id] || p.status !== r.status || p.total !== r.total;
+      }).map(r => r.id);
+      const idsNow = {};
+      rows.forEach(r => { idsNow[r.id] = 1; });
+      const removed = prev.some(o => !idsNow[o.id]);
+      if (!stale.length && rows.length === prev.length && !removed) return; /* nothing changed */
+      const apply = itemsById => {
+        ordersCache = rows.map(r => normOrder(Object.assign({}, r, {
+          items: (itemsById && itemsById[r.id]) || (prevById[r.id] && prevById[r.id].items) || [],
+        })));
+        /* forget orders that no longer exist server-side */
+        const keep = {};
+        ordersCache.forEach(o => { keep[o.id] = 1; });
+        Object.keys(ordItemsState).forEach(k => { if (!keep[k]) delete ordItemsState[k]; });
+        lsSet(K_ORD, ordersCache);
+        dbNotify({ type: "orders" });
+      };
+      if (!stale.length) { apply(null); return; }
+      fetchOrderItems(stale).then(([e2, irows]) => {
+        /* mark attempted ids as done either way: an id the RLS hides (a pending
+           order on the public shop) must not trigger a refetch on every poll */
+        stale.forEach(id => { ordItemsState[id] = 1; });
+        const byId = {};
+        (Array.isArray(irows) ? irows : []).forEach(r => { byId[r.id] = r.items; });
+        if (e2) console.warn("ZEUSSHOP db: order photos failed to load — retrying on the next sync.", e2);
+        apply(byId);
+      });
+    } finally { if (done) done(); }
+  }, () => { if (done) done(); });
+}
 function reloadTable(table) {
   if (!supa || !DB_READY) return;
   reloadChains[table] = (reloadChains[table] || Promise.resolve()).catch(() => {}).then(() => new Promise(resolve => {
+    if (table === "orders") { dbSyncOrders(resolve); return; }
     fetchRows(table).then(([err, data]) => {
       try {
         if (err) return;
@@ -1128,7 +1295,6 @@ function reloadTable(table) {
         if (!dataChanged(table, rows)) return;
         if (table === "skins") { catCache = rows.map(normSkin); lsSet(K_CAT, catCache); dbNotify({ type: "catalog" }); }
         if (table === "announcement") { annCache = rows[0] ? normAnn(rows[0]) : normAnn(null); lsSet(K_ANN, annCache); dbNotify({ type: "announcement" }); }
-        if (table === "orders") { ordersCache = rows.map(normOrder); lsSet(K_ORD, ordersCache); dbNotify({ type: "orders" }); }
         if (table === "users" && IS_ADMIN_PAGE) { usersCache = rows.map(normUser); userCountCache = usersCache.length; lsSet(K_USR, usersCache); dbNotify({ type: "users" }); }
         if (table === "inventory") { invRowsCache = rows.map(normInv); lsSet(K_INV, invRowsCache); dbNotify({ type: "inventory" }); }
         if (table === "site_settings") {
@@ -1169,22 +1335,36 @@ let dbPollTimer = null;
 function dbStartPolling() {
   if (dbPollTimer) return;
   const isAdmin = IS_ADMIN_PAGE;
+  /* tiny payloads only (announcement text + settings keys) */
   const fast = () => {
     if (!supa || !DB_READY) return;
-    reloadTable("skins");
     reloadTable("announcement");
     refreshSettings();
   };
+  /* the catalog carries base64 images (~200 KB per read) and changes rarely —
+     it gets its own SLOW safety-net loop; with Realtime working, admin edits
+     arrive live anyway. This used to ride the 15-60 s loop and quietly burned
+     hundreds of MB of egress per visitor per hour. */
+  const catalog = () => {
+    if (!supa || !DB_READY) return;
+    reloadTable("skins");
+  };
+  /* inventory rows also carry base64 images — slow safety-net cadence */
   const heavy = () => {
     if (!supa || !DB_READY) return;
     reloadTable("inventory");
+  };
+  const users = () => {
+    if (!supa || !DB_READY) return;
     /* the full users table is admin-only (RLS) — only fetch it in the panel */
     if (isAdmin) reloadTable("users");
   };
   /* orders get their own loop: in the panel they are polled FAST on purpose.
      Realtime can't be trusted for pending rows (it applies RLS, and the channel
      may predate the admin sign-in), so the admin must never wait 45s+ for a new
-     purchase to show up. On the shop page the normal adaptive cadence applies. */
+     purchase to show up. On the shop page the normal adaptive cadence applies.
+     Since the sync is LITE (metadata line only, ~1 KB), the fast cadence no
+     longer costs a megabyte per tick — the photos stay cached. */
   const orders = () => {
     if (!supa || !DB_READY) return;
     reloadTable("orders");
@@ -1199,17 +1379,23 @@ function dbStartPolling() {
     });
   };
   const fastMs = () => hasRealtime() ? 60000 : (isAdmin ? 15000 : 20000);
-  const heavyMs = () => hasRealtime() ? 45000 : (isAdmin ? 6000 : 12000);
+  const catalogMs = () => hasRealtime() ? 600000 : (isAdmin ? 30000 : 60000);
+  const heavyMs = () => hasRealtime() ? 300000 : (isAdmin ? 30000 : 60000);
+  const usersMs = () => hasRealtime() ? 90000 : (isAdmin ? 15000 : 30000);
   const ordersMs = () => (isAdmin ? 4000 : (hasRealtime() ? 45000 : 12000));
   const countMs = () => hasRealtime() ? 90000 : 30000;
   const loop = (fn, ms) => { fn(); setTimeout(() => loop(fn, ms), ms()); };
   fast();
+  catalog();
   orders();
   heavy();
+  users();
   counts();
   loop(fast, fastMs);
+  loop(catalog, catalogMs);
   loop(orders, ordersMs);
   loop(heavy, heavyMs);
+  loop(users, usersMs);
   loop(counts, countMs);
   dbPollTimer = true;
 }

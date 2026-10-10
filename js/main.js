@@ -1395,11 +1395,12 @@ if (profileModal) {
   }
   /* receipts are stored base64 INSIDE the order row: an untouched 8 MB photo makes
      the orders query so heavy it times out and the admin panel shows nothing.
-     Shrink it (like the hero image) before it ever reaches the database. */
+     Shrink it (like the hero image) before it ever reaches the database.
+     1000px / q.62 → ~60-100 KB per receipt instead of the old ~300 KB. */
   function shrinkReceipt(dataUrl, cb) {
     const img = new Image();
     img.onload = () => {
-      const MAXW = 1400;
+      const MAXW = 1000;
       let w = img.naturalWidth, h = img.naturalHeight;
       if (!w || !h) { cb(dataUrl); return; }
       if (w > MAXW) { h = Math.round(h * MAXW / w); w = MAXW; }
@@ -1407,7 +1408,7 @@ if (profileModal) {
         const cv = document.createElement("canvas");
         cv.width = w; cv.height = h;
         cv.getContext("2d").drawImage(img, 0, 0, w, h);
-        const out = cv.toDataURL("image/webp", .82);
+        const out = cv.toDataURL("image/webp", .62);
         cb((!out || out.length >= dataUrl.length) ? dataUrl : out);
       } catch { cb(dataUrl); }
     };
