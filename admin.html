@@ -1,7 +1,35 @@
 ﻿<!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" data-v="1">
 <head>
   <meta charset="UTF-8" />
+  <script>
+    /* ===== AUTO-UPDATE (frozen code — only data-v bumps, once per deploy) =====
+       This document carries data-v = build number. On load, every 5 minutes,
+       and whenever the tab becomes visible, re-fetch our own page with the
+       HTTP cache bypassed; if the server's build is NEWER, replace the URL
+       with a cache-busted query → fresh HTML + fresh ?v= assets reload with a
+       single blink the user never thinks about. Builds only ever grow, so even
+       a lagging CDN edge can never cause a reload loop. Offline or old
+       browsers (no fetch) fail silently — the page just keeps running. */
+    (function () {
+      function check() {
+        if (!window.fetch || !location.pathname) return;
+        var cur = parseInt(document.documentElement.getAttribute("data-v"), 10);
+        if (!(cur >= 0)) cur = 0;
+        fetch(location.pathname + "?_nc=" + Date.now(), { cache: "no-store" })
+          .then(function (r) { return r.ok ? r.text() : ""; })
+          .then(function (t) {
+            var m = t.match(/<html[^>]*\bdata-v="(\d+)"/);
+            var next = m ? parseInt(m[1], 10) : -1;
+            if (next > cur) location.replace(location.pathname + "?_v=" + next + location.hash);
+          })
+          .catch(function () { });
+      }
+      check();
+      setInterval(check, 300000);
+      document.addEventListener("visibilitychange", function () { if (!document.hidden) check(); });
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>پنل مدیریت | ZEUSSHOP</title>
   <link rel="icon" type="image/png" href="image/fav.png" />
