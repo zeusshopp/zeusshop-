@@ -1890,11 +1890,14 @@ async function wipeAndRestoreTable(supa, t, rows) {
   /* identity / primary keys differ per table — delete all rows by id where present */
   const hasId = t === "skins" || t === "orders" || t === "inventory" || t === "users" || t === "announcement";
   let del = null;
+  /* no .select() on these wipes: return=representation is routed to a stricter
+     API gateway that can reject it (verified 2026-10-13) — the row list is
+     never used here anyway, only del.error matters. */
   if (hasId) {
-    del = await supa.from(t).delete().neq("id", -1).select();
+    del = await supa.from(t).delete().neq("id", -1);
   } else {
     /* site_settings has no id column — delete by key */
-    del = await supa.from(t).delete().neq("key", "").select();
+    del = await supa.from(t).delete().neq("key", "");
   }
   if (del && del.error) throw del.error;
 
@@ -1912,7 +1915,10 @@ async function wipeAndRestoreTable(supa, t, rows) {
     if ((t === "skins" || t === "inventory") && !c.created_at) c.created_at = new Date().toISOString();
     return c;
   });
-  const ins = await supa.from(t).upsert(clean, { onConflict: t === "site_settings" ? "key" : "id" });
+  /* PLAIN INSERT ONLY — the wipe above removed every row so no conflict can
+     occur, and on_conflict / Prefer: resolution=* variants are rejected by the
+     project's stricter API gateway with a bogus RLS error (verified 2026-10-13). */
+  const ins = await supa.from(t).insert(clean);
   if (ins.error) throw ins.error;
 }
 

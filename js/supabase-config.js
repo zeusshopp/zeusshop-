@@ -12,5 +12,5 @@
    فایل SQL ساخت جدول‌ها: supabase-setup.sql در روت پروژه
    ========================================================= */
 
-const SUPA_PROJECT_URL = "https://bsoyabezkmuxgjhzlwjs.supabase.co";   // مثال: "https://xyzcompany.supabase.co"
-const SUPA_ANON_KEY = "sb_publishable_oYykmaEgAA7JSnjnvAq6fg_UuagRtrm";
+const SUPA_PROJECT_URL = "https://ikhziglbzzqmfdjtffos.supabase.co";   // مثال: "https://xyzcompany.supabase.co"
+const SUPA_ANON_KEY = "sb_publishable_a82Y1IJfDjbrXWqOTaothw_Bvrkq7GJ";

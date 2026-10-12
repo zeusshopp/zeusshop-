@@ -505,13 +505,13 @@ function addUser(tg) {
   next.push({ id: id, tg: tg, date: new Date().toISOString() });
   usersCache = next;
   lsSet(K_USR, usersCache);
-  /* insert-only: RLS lets anonymous users INSERT. Duplicate protection goes through
-     upsert()+ignoreDuplicates because THIS client build's .insert() silently IGNORES
-     {onConflict,ignoreDuplicates} (they only work on .upsert()) — so the 2nd insert of
-     the same telegram (entered at the telegram step, then again on receipt submit)
-     used to throw duplicate key "users_tg_key" and toast a scary save error.
-     Prefer: resolution=ignore-duplicates → ON CONFLICT DO NOTHING needs no UPDATE
-     right, so it still passes the public-only INSERT policy. */
+  /* insert-only: RLS lets anonymous users INSERT. PLAIN INSERT ONLY — never
+     .upsert() here: verified 2026-10-13 the project's gateway routes
+     on_conflict / Prefer: resolution=* requests to a stricter PostgREST that
+     rejects anon inserts with a bogus RLS error (42501) even under
+     `with check (true)` policies, while the identical plain insert returns201.
+     The duplicate-tg case (entered at the telegram step, then again on receipt
+     submit) is a 23505 below — report() already treats it as a no-op. */
   if (DB_MODE) dbRevive(6000).then(function () {
     if (!(DB_READY && supa)) return;
     const isDup = e => /duplicate|unique|users_tg_key/i.test(String((e && e.message) || e || ""));
@@ -528,7 +528,7 @@ function addUser(tg) {
       }
       dbLog(e);
     };
-    supa.from("users").upsert([{ id: id, tg, date: new Date().toISOString() }], { onConflict: "tg", ignoreDuplicates: true })
+    supa.from("users").insert([{ id: id, tg, date: new Date().toISOString() }])
       .then(r => { if (r.error) report(r.error); })
       .catch(report);
   });
@@ -560,11 +560,24 @@ function placeOrder(o) {
     if (!(DB_READY && supa)) { orderInsertFailed(new Error("database unreachable")); return; }
     const payBase = { id: row.id, telegram: row.telegram, items: row.items, total: row.total, status: row.status, date: row.date };
     const tryInsert = (payload, cb) => {
-      /* this client build ignores onConflict on .insert() — .upsert() honors it.
-         ignoreDuplicates → ON CONFLICT DO NOTHING (no UPDATE right needed), so a
-         repeated/same-millisecond order id can never crash the checkout. */
-      supa.from("orders").upsert([payload], { onConflict: "id", ignoreDuplicates: true })
-        .then(r => { if (r.error) cb(r.error); }).catch(cb);
+      /* PLAIN INSERT ONLY — never .upsert() here. Verified 2026-10-13: the
+         project's API gateway routes on_conflict / Prefer: resolution=* /
+         return=representation requests to a stricter PostgREST that rejects
+         anonymous inserts with a bogus "row-level security" error (42501) even
+         when the policy is `with check (true)` — while the identical plain
+         insert returns 201. Upsert was only needed for same-millisecond id
+         collisions, which we now solve by retrying with a fresh id. */
+      supa.from("orders").insert([payload])
+        .then(r => {
+          if (!r.error) return cb(null);
+          if (r.error.code === "23505") {
+            const again = Object.assign({}, payload, { id: Date.now() });
+            supa.from("orders").insert([again])
+              .then(r2 => cb(r2.error || null)).catch(cb);
+            return;
+          }
+          cb(r.error);
+        }).catch(cb);
     };
     if (row.coupon) {
       tryInsert({ ...payBase, coupon: row.coupon }, err => {
@@ -724,8 +737,26 @@ function dbLog(err) {
 
 function dbUpsert(table, rows, conflict) {
   if (!rows || !rows.length) return Promise.resolve();
-  return supa.from(table).upsert(rows, conflict ? { onConflict: conflict } : {})
-    .then(r => { if (r.error) dbLog(r.error); return r; })
+  /* GATEWAY-SAFE UPSERT EMULATION (verified 2026-10-13): this project's API
+     gateway routes on_conflict / Prefer: resolution=* requests to a stricter
+     PostgREST that rejects them with a bogus "row-level security" 42501 even
+     when the policy is `with check (true)` — while the identical plain insert
+     returns 201. So: plain insert first; on duplicate key (23505) delete the
+     conflicting rows by key and re-insert (same net effect as upsert).
+     Callers still receive the normal `{ error }` response object. */
+  const done = r => { if (r && r.error) dbLog(r.error); return r; };
+  return supa.from(table).insert(rows)
+    .then(r => {
+      if (!r.error || r.error.code !== "23505" || !conflict) return done(r);
+      const keys = rows.map(x => x && x[conflict]).filter(v => v !== null && v !== undefined);
+      if (!keys.length) return done(r);
+      return supa.from(table).delete().in(conflict, keys)
+        .then(d => {
+          if (d.error) return done(d);
+          return supa.from(table).insert(rows).then(done).catch(e => { dbLog(e); return { error: e }; });
+        })
+        .catch(e => { dbLog(e); return { error: e }; });
+    })
     .catch(dbLog);
 }
 
